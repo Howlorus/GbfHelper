@@ -25,24 +25,33 @@
         Open a Granblue Fantasy tab to enable session actions.
       </p>
 
-      <nav class="actions" aria-label="Session actions">
-        <button type="button" class="action" data-action="scan" data-us="US-02-01" disabled>
+      <nav class="actions" id="actions" aria-label="Session actions">
+        <button type="button" class="action" data-action="scan" data-event="START_ACCOUNT_SCAN" data-follow-up="US-02-01" disabled>
           <span class="action-label">Scan Account</span>
           <span class="action-meta">E02</span>
         </button>
-        <button type="button" class="action" data-action="calibrate" data-us="US-08-02" disabled>
+        <button type="button" class="action" data-action="calibrate" data-event="START_CALIBRATION_SESSION" data-follow-up="US-08-02" disabled>
           <span class="action-label">Calibration Lab</span>
           <span class="action-meta">E08</span>
         </button>
-        <button type="button" class="action" data-action="raid" data-us="US-11-01" disabled>
+        <button type="button" class="action" data-action="raid" data-event="START_RAID_SESSION" data-follow-up="US-11-01" disabled>
           <span class="action-label">Raid Session</span>
           <span class="action-meta">E11</span>
         </button>
-        <button type="button" class="action" data-action="update" data-us="US-12-01" disabled>
+        <button type="button" class="action" data-action="update" data-event="START_KNOWLEDGE_UPDATE" data-follow-up="US-12-01" disabled>
           <span class="action-label">Update Center</span>
           <span class="action-meta">E12</span>
         </button>
       </nav>
+
+      <section class="session-panel" id="session-panel" hidden aria-live="polite">
+        <p class="session-panel-label">
+          <span class="session-panel-dot" aria-hidden="true"></span>
+          Session active: <strong id="session-panel-name"></strong>
+        </p>
+        <p class="session-panel-meta" id="session-panel-meta"></p>
+        <button type="button" class="stop-button" id="stop-button">Stop session</button>
+      </section>
 
       <p class="action-notice" id="action-notice" role="status" aria-live="polite"></p>
     </main>
