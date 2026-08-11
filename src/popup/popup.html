@@ -52,32 +52,56 @@
         <dl class="session-panel-facts">
           <dt>Tab</dt>
           <dd id="session-tab">—</dd>
-          <dt>Category</dt>
+          <dt>Observing</dt>
           <dd id="session-category">—</dd>
           <dt>Duration</dt>
-          <dd id="session-duration" aria-live="off" aria-atomic="true">0:00</dd>
+          <dd id="session-duration" aria-live="off">0:00</dd>
         </dl>
 
         <section class="scan-progress" id="scan-progress" hidden>
           <h2 class="scan-progress-title">Progress</h2>
           <dl class="scan-progress-facts">
-            <dt>Characters</dt><dd><span id="scan-count-characters">0</span> · <span id="scan-status-characters">not started</span></dd>
-            <dt>Weapons</dt><dd><span id="scan-count-weapons">0</span> · <span id="scan-status-weapons">not started</span></dd>
-            <dt>Summons</dt><dd><span id="scan-count-summons">0</span> · <span id="scan-status-summons">not started</span></dd>
-            <dt>Teams</dt><dd><span id="scan-count-teams">0</span> · <span id="scan-status-teams">not started</span></dd>
+            <dt>Characters</dt>
+            <dd>
+              <span id="scan-count-characters">0</span> · <span id="scan-status-characters">not started</span>
+              <span class="scan-reason" id="scan-reason-characters"></span>
+            </dd>
+            <dt>Weapons</dt>
+            <dd>
+              <span id="scan-count-weapons">0</span> · <span id="scan-status-weapons">not started</span>
+              <span class="scan-reason" id="scan-reason-weapons"></span>
+            </dd>
+            <dt>Summons</dt>
+            <dd>
+              <span id="scan-count-summons">0</span> · <span id="scan-status-summons">not started</span>
+              <span class="scan-reason" id="scan-reason-summons"></span>
+            </dd>
+            <dt>Teams</dt>
+            <dd>
+              <span id="scan-count-teams">0</span> · <span id="scan-status-teams">not started</span>
+              <span class="scan-reason" id="scan-reason-teams"></span>
+            </dd>
           </dl>
           <p class="scan-last" id="scan-last" hidden>
-            Last: <span id="scan-last-path">—</span>
-            <span class="scan-last-ago" id="scan-last-ago"></span>
+            Last observed: <span id="scan-last-path">—</span>
+            <span class="scan-last-purpose" id="scan-last-purpose"></span>
           </p>
           <p class="scan-hint" id="scan-hint">
-            Open DevTools (F12) on the GBF tab so payloads can be observed.
+            Open DevTools (F12) on the GBF tab to enable capture.
           </p>
         </section>
 
+        <p id="stop-description" class="sr-only">
+          Stop &amp; discard ends the session without saving observed records.
+        </p>
+        <p id="commit-description" class="sr-only">
+          Save &amp; stop writes the observed records to your local inventory, then ends the session.
+        </p>
         <div class="session-actions">
-          <button type="button" class="commit-button" id="commit-button" hidden>Save &amp; stop</button>
-          <button type="button" class="stop-button" id="stop-button">Stop &amp; discard</button>
+          <button type="button" class="commit-button" id="commit-button"
+                  aria-describedby="commit-description" hidden>Save &amp; stop</button>
+          <button type="button" class="stop-button" id="stop-button"
+                  aria-describedby="stop-description">Stop &amp; discard</button>
         </div>
       </section>
 

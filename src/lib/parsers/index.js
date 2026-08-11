@@ -1,17 +1,10 @@
 // Payload parsers, dispatched by capture "purpose" (endpoint category).
-//
-// PLACEHOLDER field maps — the actual GBF payload shapes are pinned by the
-// feasibility slice (§49 Q1, Q11). Each PARSERS entry is a best-guess based
-// on GBF's REST conventions. Missing fields on a record are marked
-// "not observed" via null, and the record's completeness becomes "partial".
-//
-// Add a purpose here to enable it — the domain sink and status reporting
-// pick it up automatically.
+// Each spec is a table {listKey, fields}. Field maps are PLACEHOLDER guesses;
+// feasibility (§49 Q1) pins the real GBF keys.
 
 export const PARSERS = {};
 
 export function registerParser(purpose, spec) {
-  if (PARSERS[purpose]) throw new Error(`parser for '${purpose}' already registered`);
   PARSERS[purpose] = spec;
 }
 
@@ -38,7 +31,9 @@ export function parsePayload(purpose, body) {
       warnings.push("skipped non-object entry");
       continue;
     }
-    const record = { _purpose: purpose, _capturedAt: Date.now() };
+    const record = Object.create(null);
+    record._purpose = purpose;
+    record._capturedAt = Date.now();
     let missing = 0;
     for (const [field, sourceKey] of Object.entries(spec.fields)) {
       const v = raw[sourceKey];
@@ -60,8 +55,6 @@ export function parsePayload(purpose, body) {
 
 function extractList(doc, listKey) {
   if (Array.isArray(doc)) return doc;
-  if (!doc || typeof doc !== "object") return null;
-  if (Array.isArray(doc[listKey])) return doc[listKey];
-  // Fallback: GBF sometimes returns id-keyed dicts. Return values as list.
-  return Object.values(doc).filter((v) => v && typeof v === "object");
+  if (doc && typeof doc === "object" && Array.isArray(doc[listKey])) return doc[listKey];
+  return null;
 }

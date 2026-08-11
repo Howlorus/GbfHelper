@@ -11,7 +11,8 @@ import "./lib/parsers/characters.js";
 import "./lib/parsers/weapons.js";
 import "./lib/parsers/summons.js";
 import "./lib/parsers/teams.js";
-import { buildInventoryFromBuffer } from "./lib/inventory-commit.js";
+import { planCommit } from "./lib/inventory-commit.js";
+import { scanLifecycleAction } from "./lib/scan-lifecycle.js";
 
 const BADGE_BG = "#e0a020";
 const BADGE_FG = "#101010";
@@ -54,19 +55,18 @@ async function dispatch(action) {
   if (next === current) return current;
   await setState(next);
   if (next.state !== current.state) {
-    console.log("[GBF Copilot] state:", current.state, "->", next.state, "on", action.type);
     if (isSessionActive(current) && !isSessionActive(next)) {
-      const { durationMs, results } = await captureRegistry.detachAll();
+      const { results } = await captureRegistry.detachAll();
       const failures = results.filter((r) => !r.ok).length;
-      console.log(`[GBF Copilot] detached ${results.length} adapter(s) in ${durationMs}ms (${failures} failed)`);
+      if (failures) console.warn(`[GBF Copilot] ${failures} adapter(s) failed to detach`);
     }
-    // Scan progress + record buffer lifecycle: seed on entry, clear on exit.
-    if (current.state !== STATES.ACCOUNT_SCAN_ACTIVE && next.state === STATES.ACCOUNT_SCAN_ACTIVE) {
+    const lifecycle = scanLifecycleAction(current, next);
+    if (lifecycle === "seed") {
       await chrome.storage.session.set({
         [SCAN_PROGRESS_KEY]: initialProgress(),
         [SCAN_BUFFER_KEY]: initialScanBuffer(),
       });
-    } else if (current.state === STATES.ACCOUNT_SCAN_ACTIVE && next.state !== STATES.ACCOUNT_SCAN_ACTIVE) {
+    } else if (lifecycle === "clear") {
       await chrome.storage.session.remove([SCAN_PROGRESS_KEY, SCAN_BUFFER_KEY]);
     }
     await updateBadge(next);
@@ -115,9 +115,6 @@ if (chrome.runtime.onSuspend) {
   });
 }
 
-// Capture adapters (currently: DevTools page) connect via chrome.runtime.connect
-// with a port name prefixed "capture:". Each connected port becomes an entry
-// in the CaptureRegistry — detachAll broadcasts STOP_CAPTURE.
 chrome.runtime.onConnect.addListener((port) => {
   if (!port?.name?.startsWith("capture:")) return;
   const adapterId = port.name;
@@ -127,23 +124,16 @@ chrome.runtime.onConnect.addListener((port) => {
       try { port.disconnect(); } catch {}
       resolve();
     }));
-    console.log(`[GBF Copilot] capture adapter connected: ${adapterId}`);
   } catch (err) {
     console.warn(`[GBF Copilot] adapter register failed:`, err);
     try { port.disconnect(); } catch {}
     return;
   }
   port.onDisconnect.addListener(() => {
-    if (captureRegistry.has(adapterId)) {
-      captureRegistry.unregister(adapterId);
-      console.log(`[GBF Copilot] capture adapter disconnected: ${adapterId}`);
-    }
+    if (captureRegistry.has(adapterId)) captureRegistry.unregister(adapterId);
   });
   port.onMessage.addListener((msg) => {
     if (msg?.type === "PAYLOAD" && msg.payload) {
-      console.log("[GBF Copilot] observed:",
-        msg.payload.method, msg.payload.url, `(${msg.payload.purpose})`);
-      // Domain sink: accumulate scan progress only when a scan is active (AC4).
       onCapturePayload(msg.payload).catch((err) =>
         console.warn("[GBF Copilot] scan sink failed:", err));
     }
@@ -155,18 +145,26 @@ async function commitInventory() {
   if (state.state !== STATES.ACCOUNT_SCAN_ACTIVE) {
     return { ok: false, error: "no active scan session" };
   }
-  const { [SCAN_BUFFER_KEY]: buffer } = await chrome.storage.session.get(SCAN_BUFFER_KEY);
-  const inventory = buildInventoryFromBuffer(buffer, {
-    schemaVersion: 1,
-    extensionVersion: chrome.runtime.getManifest().version,
-    committedAt: Date.now(),
-  });
-  // Snapshot the previous inventory for a one-step rollback (§43 reliability).
-  const prev = await chrome.storage.local.get("inventory");
-  if (prev.inventory) await chrome.storage.local.set({ inventoryPrev: prev.inventory });
-  await chrome.storage.local.set({ inventory });
-  await dispatch({ type: EVENTS.STOP_SESSION });
-  return { ok: true, completeness: inventory.completeness, committedAt: inventory.committedAt };
+  try {
+    const [{ [SCAN_BUFFER_KEY]: buffer }, prev] = await Promise.all([
+      chrome.storage.session.get(SCAN_BUFFER_KEY),
+      chrome.storage.local.get("inventory"),
+    ]);
+    const delta = planCommit(prev.inventory || null, buffer, {
+      schemaVersion: 1,
+      extensionVersion: chrome.runtime.getManifest().version,
+      committedAt: Date.now(),
+    });
+    // Single atomic set: chrome.storage.local commits all keys together. A
+    // mid-write crash cannot leave inventory written but inventoryPrev stale.
+    await chrome.storage.local.set(delta);
+    // Only tear down the scan after persistence has landed.
+    await dispatch({ type: EVENTS.STOP_SESSION });
+    return { ok: true, completeness: delta.inventory.completeness, committedAt: delta.inventory.committedAt };
+  } catch (err) {
+    console.warn("[GBF Copilot] commit failed:", err);
+    return { ok: false, error: String(err?.message || err) };
+  }
 }
 
 async function onCapturePayload(payload) {

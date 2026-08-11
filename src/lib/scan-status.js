@@ -1,14 +1,7 @@
-// Aggregates a §13.5 status per scan category from the running scan buffer.
-// Never resolves to Complete unless we have evidence for every expected
-// category AND no negative parser signal.
-//
-// Statuses (§13.5): Complete / Partial / Filtered / Stale / Inconsistent / Failed.
-// This module also emits a short human-readable "reason" so the UI can be
-// honest about WHY a category is not Complete.
+// Per-category §13.5 aggregation. Never returns Complete without both records
+// AND a positive parser signal — errs toward Partial rather than mislabel.
 
 export const CATEGORIES = Object.freeze(["characters", "weapons", "summons", "teams"]);
-
-const NOT_STARTED = "not started";
 
 export function computeCategoryStatus(buffer, category) {
   const records = buffer?.[category] || [];
@@ -16,7 +9,7 @@ export function computeCategoryStatus(buffer, category) {
   const warnings = (buffer?.warnings || []).filter((w) => w.startsWith(`${category}:`));
 
   if (records.length === 0 && !parserStatus) {
-    return { status: "Partial", reason: NOT_STARTED, records: 0 };
+    return { status: "Partial", reason: "not started", records: 0 };
   }
   if (parserStatus === "Inconsistent") {
     return { status: "Inconsistent", reason: firstWarning(warnings) || "parser rejected payload shape", records: records.length };
@@ -27,8 +20,7 @@ export function computeCategoryStatus(buffer, category) {
   if (records.length === 0) {
     return { status: "Filtered", reason: "endpoint matched but the response yielded no records", records: 0 };
   }
-  const anyPartial = records.some((r) => r.completeness === "partial");
-  if (anyPartial) {
+  if (records.some((r) => r.completeness === "partial")) {
     return { status: "Partial", reason: "some records were missing expected fields", records: records.length };
   }
   if (parserStatus === "Partial") {
@@ -37,25 +29,17 @@ export function computeCategoryStatus(buffer, category) {
   if (parserStatus === "Complete") {
     return { status: "Complete", reason: "all records observed with all expected fields", records: records.length };
   }
-  // Records exist but no explicit parserStatus set — treat as Partial rather
-  // than promoting to Complete without evidence.
   return { status: "Partial", reason: "records observed but no parser Complete signal", records: records.length };
 }
 
+const SEVERITY = { Complete: 0, Partial: 1, Filtered: 2, Stale: 2, Inconsistent: 3, Failed: 4 };
+
 export function computeReport(buffer) {
   const perCategory = {};
-  let overall = "Complete";
-  for (const cat of CATEGORIES) {
-    perCategory[cat] = computeCategoryStatus(buffer, cat);
-    if (perCategory[cat].status !== "Complete") overall = "Partial";
-  }
-  // Escalate overall to a more severe status if any category has one.
-  const severity = { Complete: 0, Partial: 1, Filtered: 2, Stale: 2, Inconsistent: 3, Failed: 4 };
   let worst = "Complete";
   for (const cat of CATEGORIES) {
-    if ((severity[perCategory[cat].status] ?? 0) > (severity[worst] ?? 0)) {
-      worst = perCategory[cat].status;
-    }
+    perCategory[cat] = computeCategoryStatus(buffer, cat);
+    if ((SEVERITY[perCategory[cat].status] ?? 0) > (SEVERITY[worst] ?? 0)) worst = perCategory[cat].status;
   }
   return { perCategory, overall: worst };
 }

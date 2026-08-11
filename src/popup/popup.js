@@ -1,7 +1,6 @@
 import { urlMatchesAllowlist } from "../lib/host-check.js";
 import { STATES, EVENTS, isSessionActive, sessionMeta } from "../lib/state-machine.js";
-import { SCAN_PURPOSES } from "../lib/scan-progress.js";
-import { computeCategoryStatus } from "../lib/scan-status.js";
+import { CATEGORIES, computeCategoryStatus } from "../lib/scan-status.js";
 
 function fmtDuration(ms) {
   const s = Math.max(0, Math.floor(ms / 1000));
@@ -89,10 +88,14 @@ function showActions(state, { onGbf, scanProgress, scanBuffer }) {
     scanBlock.hidden = state.state !== STATES.ACCOUNT_SCAN_ACTIVE;
     if (state.state === STATES.ACCOUNT_SCAN_ACTIVE) {
       renderScanProgress(scanProgress, scanBuffer);
-      const hasRecords = SCAN_PURPOSES.some((p) => (scanBuffer?.[p]?.length || 0) > 0);
+      const hasRecords = CATEGORIES.some((p) => (scanBuffer?.[p]?.length || 0) > 0);
       document.getElementById("commit-button").hidden = !hasRecords;
     } else {
       document.getElementById("commit-button").hidden = true;
+    }
+    // Focus a non-destructive control by default (never Save, never Discard).
+    if (document.activeElement === document.body) {
+      document.getElementById("session-panel-name")?.focus?.();
     }
     return;
   }
@@ -108,24 +111,23 @@ function showActions(state, { onGbf, scanProgress, scanBuffer }) {
 }
 
 function renderScanProgress(progress, buffer) {
-  for (const purpose of SCAN_PURPOSES) {
-    const count = progress?.purposeCounts?.[purpose] ?? 0;
-    const s = computeCategoryStatus(buffer, purpose);
-    const el = document.getElementById(`scan-status-${purpose}`);
-    document.getElementById(`scan-count-${purpose}`).textContent = String(count);
-    el.textContent = s.status;
-    el.title = s.reason || "";
+  for (const cat of CATEGORIES) {
+    const count = progress?.purposeCounts?.[cat] ?? 0;
+    const s = computeCategoryStatus(buffer, cat);
+    document.getElementById(`scan-count-${cat}`).textContent = String(count);
+    document.getElementById(`scan-status-${cat}`).textContent = s.status;
+    document.getElementById(`scan-reason-${cat}`).textContent = s.reason || "";
   }
   const last = progress?.lastObserved;
   const lastEl = document.getElementById("scan-last");
   const lastPath = document.getElementById("scan-last-path");
-  const lastAgo = document.getElementById("scan-last-ago");
+  const lastPurpose = document.getElementById("scan-last-purpose");
   const hint = document.getElementById("scan-hint");
   if (last) {
     lastEl.hidden = false;
     try { lastPath.textContent = new URL(last.url).pathname; }
     catch { lastPath.textContent = last.url || "—"; }
-    lastAgo.textContent = ` · ${last.purpose}`;
+    lastPurpose.textContent = ` · ${last.purpose}`;
     hint.hidden = true;
   } else {
     lastEl.hidden = true;
@@ -186,18 +188,9 @@ async function refresh() {
 document.getElementById("actions").addEventListener("click", async (e) => {
   const btn = e.target.closest("button.action");
   if (!btn || btn.disabled) return;
-  const type = btn.dataset.event;
   const tab = await getActiveTab();
-  const next = await dispatch({ type, tabId: tab?.id, tabTitle: tab?.title });
-  if (next?.error) {
-    document.getElementById("action-notice").textContent = next.error;
-    return;
-  }
-  const followUp = btn.dataset.followUp;
-  if (followUp) {
-    document.getElementById("action-notice").textContent =
-      `Session started. Full behavior lands in ${followUp}.`;
-  }
+  const next = await dispatch({ type: btn.dataset.event, tabId: tab?.id, tabTitle: tab?.title });
+  if (next?.error) document.getElementById("action-notice").textContent = next.error;
   await refresh();
 });
 
@@ -210,12 +203,9 @@ document.getElementById("commit-button").addEventListener("click", async () => {
   const notice = document.getElementById("action-notice");
   notice.textContent = "Saving…";
   const res = await send({ type: "COMMIT_INVENTORY" });
-  if (res?.ok) {
-    const overall = res.completeness?.overall || "Partial";
-    notice.textContent = `Inventory saved (${overall}). Previous snapshot retained.`;
-  } else {
-    notice.textContent = `Save failed: ${res?.error || "unknown error"}`;
-  }
+  notice.textContent = res?.ok
+    ? `Inventory saved (${res.completeness?.overall || "Partial"}).`
+    : "Save failed. Your previous inventory is unchanged. See DevTools console.";
   await refresh();
 });
 

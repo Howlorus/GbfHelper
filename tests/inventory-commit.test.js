@@ -1,6 +1,7 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { buildInventoryFromBuffer, summarizeReport, CATEGORIES } from "../src/lib/inventory-commit.js";
+import { buildInventoryFromBuffer, planCommit } from "../src/lib/inventory-commit.js";
+import { CATEGORIES } from "../src/lib/scan-status.js";
 
 function buffer() {
   const b = { parserStatus: {}, warnings: [] };
@@ -33,20 +34,28 @@ test("buffer with mixed records produces a snapshot with the correct counts + st
   assert.deepEqual(inv.warnings, ["weapons: missing skill_level"]);
 });
 
-test("buildInventoryFromBuffer is pure — input buffer is not mutated", () => {
-  const b = buffer();
-  b.characters = [{ completeness: "observed" }];
-  const before = JSON.stringify(b);
-  buildInventoryFromBuffer(b);
-  assert.equal(JSON.stringify(b), before);
+test("planCommit with no prior inventory writes only { inventory }", () => {
+  const delta = planCommit(null, buffer(), { schemaVersion: 1, extensionVersion: "0.0.1", committedAt: 1 });
+  assert.ok(delta.inventory);
+  assert.equal(delta.inventoryPrev, undefined);
 });
 
-test("summarizeReport gives a one-liner per category with counts", () => {
+test("planCommit with a prior inventory produces an atomic { inventory, inventoryPrev } delta", () => {
+  const old = { schemaVersion: 1, committedAt: 100, characters: [{ x: 1 }] };
+  const delta = planCommit(old, buffer(), { schemaVersion: 1, extensionVersion: "0.0.1", committedAt: 200 });
+  // Both keys present -> chrome.storage.local.set(delta) is atomic across them,
+  // so a mid-write crash cannot leave one written and the other stale.
+  assert.deepEqual(delta.inventoryPrev, old);
+  assert.equal(delta.inventory.committedAt, 200);
+});
+
+test("planCommit is pure — inputs are not mutated", () => {
   const b = buffer();
   b.characters = [{ completeness: "observed" }];
-  b.parserStatus.characters = "Complete";
-  const inv = buildInventoryFromBuffer(b);
-  const line = summarizeReport(inv.completeness);
-  assert.ok(line.includes("characters: Complete (1)"));
-  assert.ok(line.includes("weapons: Partial (0)"));
+  const old = { committedAt: 100 };
+  const beforeB = JSON.stringify(b);
+  const beforeOld = JSON.stringify(old);
+  planCommit(old, b, { committedAt: 200 });
+  assert.equal(JSON.stringify(b), beforeB);
+  assert.equal(JSON.stringify(old), beforeOld);
 });

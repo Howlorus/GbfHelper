@@ -80,11 +80,10 @@ test("characters: malformed JSON → Inconsistent", () => {
   assert.equal(r.records.length, 0);
 });
 
-test("characters: unknown top-level shape → Inconsistent or Filtered gracefully", () => {
+test("unknown top-level shape (no matching listKey) -> Inconsistent", () => {
   const r = parsePayload("characters", JSON.stringify({ error: "auth required" }));
-  // With fallback to Object.values, an object without list yields non-record values.
-  // Not-object entries are skipped; result set is empty → Filtered.
-  assert.ok(["Inconsistent", "Filtered", "Partial"].includes(r.status));
+  assert.equal(r.status, "Inconsistent");
+  assert.equal(r.records.length, 0);
 });
 
 test("unknown purpose returns Unsupported status", () => {
