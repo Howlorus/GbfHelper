@@ -11,6 +11,7 @@ import "./lib/parsers/characters.js";
 import "./lib/parsers/weapons.js";
 import "./lib/parsers/summons.js";
 import "./lib/parsers/teams.js";
+import { buildInventoryFromBuffer } from "./lib/inventory-commit.js";
 
 const BADGE_BG = "#e0a020";
 const BADGE_FG = "#101010";
@@ -149,6 +150,25 @@ chrome.runtime.onConnect.addListener((port) => {
   });
 });
 
+async function commitInventory() {
+  const state = await getState();
+  if (state.state !== STATES.ACCOUNT_SCAN_ACTIVE) {
+    return { ok: false, error: "no active scan session" };
+  }
+  const { [SCAN_BUFFER_KEY]: buffer } = await chrome.storage.session.get(SCAN_BUFFER_KEY);
+  const inventory = buildInventoryFromBuffer(buffer, {
+    schemaVersion: 1,
+    extensionVersion: chrome.runtime.getManifest().version,
+    committedAt: Date.now(),
+  });
+  // Snapshot the previous inventory for a one-step rollback (§43 reliability).
+  const prev = await chrome.storage.local.get("inventory");
+  if (prev.inventory) await chrome.storage.local.set({ inventoryPrev: prev.inventory });
+  await chrome.storage.local.set({ inventory });
+  await dispatch({ type: EVENTS.STOP_SESSION });
+  return { ok: true, completeness: inventory.completeness, committedAt: inventory.committedAt };
+}
+
 async function onCapturePayload(payload) {
   const state = await getState();
   if (state.state !== STATES.ACCOUNT_SCAN_ACTIVE) return; // AC4
@@ -178,6 +198,11 @@ chrome.runtime.onMessage.addListener((msg, _sender, sendResponse) => {
         sendResponse(await getState());
       } else if (msg?.type === "DISPATCH" && msg.action) {
         sendResponse(await dispatch(msg.action));
+      } else if (msg?.type === "COMMIT_INVENTORY") {
+        sendResponse(await commitInventory());
+      } else if (msg?.type === "GET_INVENTORY") {
+        const { inventory } = await chrome.storage.local.get("inventory");
+        sendResponse(inventory || null);
       } else {
         sendResponse({ error: "unknown message" });
       }

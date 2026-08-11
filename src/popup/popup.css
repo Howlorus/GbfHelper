@@ -258,8 +258,12 @@ body[data-gbf="on"] .status-dot { background: var(--ready); }
   font-style: italic;
 }
 
-.stop-button {
-  align-self: stretch;
+.session-actions {
+  display: flex;
+  gap: 6px;
+}
+.stop-button, .commit-button {
+  flex: 1;
   padding: 8px 12px;
   background: transparent;
   color: var(--fg);
@@ -277,6 +281,14 @@ body[data-gbf="on"] .status-dot { background: var(--ready); }
   color: var(--warn);
   outline: none;
 }
+.commit-button:hover,
+.commit-button:focus-visible {
+  background: color-mix(in oklab, var(--ready) 20%, transparent);
+  border-color: var(--ready);
+  color: var(--ready);
+  outline: none;
+}
+.commit-button[hidden] { display: none; }
 
 .app-footer {
   padding: 8px 14px 10px;

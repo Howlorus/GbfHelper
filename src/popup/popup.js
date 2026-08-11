@@ -87,7 +87,13 @@ function showActions(state, { onGbf, scanProgress, scanBuffer }) {
     if (state.since) startDurationTimer(state.since);
     notice.textContent = "";
     scanBlock.hidden = state.state !== STATES.ACCOUNT_SCAN_ACTIVE;
-    if (state.state === STATES.ACCOUNT_SCAN_ACTIVE) renderScanProgress(scanProgress, scanBuffer);
+    if (state.state === STATES.ACCOUNT_SCAN_ACTIVE) {
+      renderScanProgress(scanProgress, scanBuffer);
+      const hasRecords = SCAN_PURPOSES.some((p) => (scanBuffer?.[p]?.length || 0) > 0);
+      document.getElementById("commit-button").hidden = !hasRecords;
+    } else {
+      document.getElementById("commit-button").hidden = true;
+    }
     return;
   }
 
@@ -197,6 +203,19 @@ document.getElementById("actions").addEventListener("click", async (e) => {
 
 document.getElementById("stop-button").addEventListener("click", async () => {
   await dispatch({ type: EVENTS.STOP_SESSION });
+  await refresh();
+});
+
+document.getElementById("commit-button").addEventListener("click", async () => {
+  const notice = document.getElementById("action-notice");
+  notice.textContent = "Saving…";
+  const res = await send({ type: "COMMIT_INVENTORY" });
+  if (res?.ok) {
+    const overall = res.completeness?.overall || "Partial";
+    notice.textContent = `Inventory saved (${overall}). Previous snapshot retained.`;
+  } else {
+    notice.textContent = `Save failed: ${res?.error || "unknown error"}`;
+  }
   await refresh();
 });
 
