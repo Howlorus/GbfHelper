@@ -24,5 +24,9 @@
 
   "host_permissions": ["https://game.granbluefantasy.jp/*"],
 
-  "web_accessible_resources": []
+  "web_accessible_resources": [],
+
+  "content_security_policy": {
+    "extension_pages": "script-src 'self'; object-src 'self'; connect-src 'self'; base-uri 'none'; form-action 'none';"
+  }
 }
