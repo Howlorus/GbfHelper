@@ -4,11 +4,17 @@
 
 import { reduce, initialState, isSessionActive, sessionMeta, EVENTS } from "./lib/state-machine.js";
 import { urlMatchesAllowlist } from "./lib/host-check.js";
+import { CaptureRegistry } from "./lib/capture-registry.js";
 
 const BADGE_BG = "#e0a020";
 const BADGE_FG = "#101010";
 
 const STATE_KEY = "state";
+
+// One registry per service-worker lifetime. When the SW dies, in-memory
+// adapters die with it (there is no live buffer to leak). When a session
+// ends via any path, detachAll is invoked before dispatch returns.
+export const captureRegistry = new CaptureRegistry();
 
 let allowlistPromise = null;
 function loadAllowlist() {
@@ -36,6 +42,11 @@ async function dispatch(action) {
   await setState(next);
   if (next.state !== current.state) {
     console.log("[GBF Copilot] state:", current.state, "->", next.state, "on", action.type);
+    if (isSessionActive(current) && !isSessionActive(next)) {
+      const { durationMs, results } = await captureRegistry.detachAll();
+      const failures = results.filter((r) => !r.ok).length;
+      console.log(`[GBF Copilot] detached ${results.length} adapter(s) in ${durationMs}ms (${failures} failed)`);
+    }
     await updateBadge(next);
   }
   return next;
@@ -60,6 +71,27 @@ async function updateBadge(state) {
 // Sync badge with persisted state on every service-worker cold start.
 getState().then(updateBadge).catch((err) =>
   console.warn("[GBF Copilot] initial badge sync failed:", err));
+
+// Extension update / reload / install: never carry a session across the boundary.
+chrome.runtime.onInstalled.addListener(async () => {
+  await captureRegistry.detachAll();
+  await chrome.storage.session.remove(STATE_KEY);
+  await updateBadge(initialState());
+});
+
+// Browser cold start: storage.session is already empty, but be explicit.
+chrome.runtime.onStartup.addListener(async () => {
+  await chrome.storage.session.remove(STATE_KEY);
+  await updateBadge(initialState());
+});
+
+// Best-effort teardown when Chrome decides to unload the SW.
+if (chrome.runtime.onSuspend) {
+  chrome.runtime.onSuspend.addListener(() => {
+    // fire-and-forget: onSuspend gives us no time for awaits.
+    captureRegistry.detachAll().catch(() => {});
+  });
+}
 
 chrome.runtime.onMessage.addListener((msg, _sender, sendResponse) => {
   (async () => {
