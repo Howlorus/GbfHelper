@@ -1,6 +1,7 @@
 import { urlMatchesAllowlist } from "../lib/host-check.js";
 import { STATES, EVENTS, isSessionActive, sessionMeta } from "../lib/state-machine.js";
-import { SCAN_PURPOSES, statusFor } from "../lib/scan-progress.js";
+import { SCAN_PURPOSES } from "../lib/scan-progress.js";
+import { computeCategoryStatus } from "../lib/scan-status.js";
 
 function fmtDuration(ms) {
   const s = Math.max(0, Math.floor(ms / 1000));
@@ -70,7 +71,7 @@ function setStatusChrome({ state, onGbf }) {
   }
 }
 
-function showActions(state, { onGbf, scanProgress }) {
+function showActions(state, { onGbf, scanProgress, scanBuffer }) {
   const actions = document.getElementById("actions");
   const panel = document.getElementById("session-panel");
   const notice = document.getElementById("action-notice");
@@ -86,7 +87,7 @@ function showActions(state, { onGbf, scanProgress }) {
     if (state.since) startDurationTimer(state.since);
     notice.textContent = "";
     scanBlock.hidden = state.state !== STATES.ACCOUNT_SCAN_ACTIVE;
-    if (state.state === STATES.ACCOUNT_SCAN_ACTIVE) renderScanProgress(scanProgress);
+    if (state.state === STATES.ACCOUNT_SCAN_ACTIVE) renderScanProgress(scanProgress, scanBuffer);
     return;
   }
 
@@ -100,11 +101,14 @@ function showActions(state, { onGbf, scanProgress }) {
   }
 }
 
-function renderScanProgress(progress) {
+function renderScanProgress(progress, buffer) {
   for (const purpose of SCAN_PURPOSES) {
     const count = progress?.purposeCounts?.[purpose] ?? 0;
+    const s = computeCategoryStatus(buffer, purpose);
+    const el = document.getElementById(`scan-status-${purpose}`);
     document.getElementById(`scan-count-${purpose}`).textContent = String(count);
-    document.getElementById(`scan-status-${purpose}`).textContent = statusFor(progress, purpose);
+    el.textContent = s.status;
+    el.title = s.reason || "";
   }
   const last = progress?.lastObserved;
   const lastEl = document.getElementById("scan-last");
@@ -143,12 +147,22 @@ async function getScanProgress() {
   }
 }
 
+async function getScanBuffer() {
+  try {
+    const { scanBuffer } = await chrome.storage.session.get("scanBuffer");
+    return scanBuffer || null;
+  } catch {
+    return null;
+  }
+}
+
 async function refresh() {
-  const [allowlist, tab, state, scanProgress] = await Promise.all([
+  const [allowlist, tab, state, scanProgress, scanBuffer] = await Promise.all([
     loadAllowlist(),
     getActiveTab(),
     getState(),
     getScanProgress(),
+    getScanBuffer(),
   ]);
   const onGbf = tab && tab.url ? urlMatchesAllowlist(tab.url, allowlist) : false;
 
@@ -159,7 +173,7 @@ async function refresh() {
   }
 
   setStatusChrome({ state, onGbf });
-  showActions(state, { onGbf, scanProgress });
+  showActions(state, { onGbf, scanProgress, scanBuffer });
   showSessionBanner(state, tab?.id);
 }
 
@@ -189,7 +203,7 @@ document.getElementById("stop-button").addEventListener("click", async () => {
 // React to state changes coming from the service worker (e.g. tab close),
 // and to scan-progress ticks from the capture sink.
 chrome.storage.onChanged.addListener((changes, area) => {
-  if (area === "session" && (changes.state || changes.scanProgress)) refresh();
+  if (area === "session" && (changes.state || changes.scanProgress || changes.scanBuffer)) refresh();
 });
 
 refresh().catch((err) => {
