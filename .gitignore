@@ -1,5 +1,6 @@
-# Product docs — canonical PRD lives here, not tracked
+# Product docs — canonical PRD, Epics, User Stories all live here, not tracked
 .docs/
+prd/
 
 # Claude / editors
 .claude/

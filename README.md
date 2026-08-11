@@ -4,8 +4,10 @@ A **local-first browser extension** that helps Granblue Fantasy players prepare 
 
 ## Specs
 
-- Canonical PRD (v5.0 Master Draft): `./.docs/PRD.md` *(not versioned — read-only source of truth)*
-- Executable spec tree — Epics and User Stories: [`./prd/`](./prd/)
+All product documentation is local, not versioned:
+
+- Canonical PRD (v5.0 Master Draft): `./.docs/PRD.md`
+- Executable spec tree — Epics and User Stories: `./.docs/prd/`
 
 ## Status
 
