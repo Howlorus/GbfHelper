@@ -8,6 +8,9 @@ import { CaptureRegistry } from "./lib/capture-registry.js";
 import { acceptPayload, initialProgress } from "./lib/scan-progress.js";
 import { parsePayload } from "./lib/parsers/index.js";
 import "./lib/parsers/characters.js";
+import "./lib/parsers/weapons.js";
+import "./lib/parsers/summons.js";
+import "./lib/parsers/teams.js";
 
 const BADGE_BG = "#e0a020";
 const BADGE_FG = "#101010";
