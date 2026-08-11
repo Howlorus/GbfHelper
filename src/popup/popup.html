@@ -5,26 +5,52 @@
     <title>GBF Copilot</title>
     <link rel="stylesheet" href="popup.css" />
   </head>
-  <body>
+  <body data-gbf="off">
     <header class="app-header">
       <h1>GBF Copilot</h1>
       <span class="app-version" id="version" aria-label="version"></span>
     </header>
 
+    <section class="banner" id="session-banner" hidden role="status" aria-live="polite">
+      <span class="banner-dot" aria-hidden="true"></span>
+      <span>Session runs on tab: <strong id="session-tab-title"></strong></span>
+    </section>
+
     <main class="app-body">
-      <p class="status status--dormant" role="status">
+      <p class="status" role="status">
         <span class="status-dot" aria-hidden="true"></span>
-        <span>Dormant</span>
+        <span class="status-label" id="status-label">Dormant</span>
       </p>
-      <p class="status-hint">
+      <p class="status-hint" id="status-hint">
         Open a Granblue Fantasy tab to enable session actions.
       </p>
+
+      <nav class="actions" aria-label="Session actions">
+        <button type="button" class="action" data-action="scan" data-us="US-02-01" disabled>
+          <span class="action-label">Scan Account</span>
+          <span class="action-meta">E02</span>
+        </button>
+        <button type="button" class="action" data-action="calibrate" data-us="US-08-02" disabled>
+          <span class="action-label">Calibration Lab</span>
+          <span class="action-meta">E08</span>
+        </button>
+        <button type="button" class="action" data-action="raid" data-us="US-11-01" disabled>
+          <span class="action-label">Raid Session</span>
+          <span class="action-meta">E11</span>
+        </button>
+        <button type="button" class="action" data-action="update" data-us="US-12-01" disabled>
+          <span class="action-label">Update Center</span>
+          <span class="action-meta">E12</span>
+        </button>
+      </nav>
+
+      <p class="action-notice" id="action-notice" role="status" aria-live="polite"></p>
     </main>
 
     <footer class="app-footer">
       <a href="#" id="open-options">Settings</a>
     </footer>
 
-    <script src="popup.js" defer></script>
+    <script type="module" src="popup.js"></script>
   </body>
 </html>

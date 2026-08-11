@@ -3,8 +3,12 @@
   --fg: #e6e8ec;
   --muted: #8a90a0;
   --accent: #6fb1ff;
+  --ready: #6bd6a0;
   --dormant: #8a90a0;
+  --warn: #e0b060;
   --divider: #22262d;
+  --surface: #1b1f26;
+  --surface-hover: #22272f;
 }
 
 @media (prefers-color-scheme: light) {
@@ -13,8 +17,12 @@
     --fg: #14161a;
     --muted: #5c6370;
     --accent: #0057c2;
+    --ready: #128a4d;
     --dormant: #5c6370;
+    --warn: #a3620d;
     --divider: #e5e7eb;
+    --surface: #f4f5f7;
+    --surface-hover: #e9ebef;
   }
 }
 
@@ -50,6 +58,28 @@ html, body {
   font-variant-numeric: tabular-nums;
 }
 
+.banner {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 14px;
+  background: var(--surface);
+  border-bottom: 1px solid var(--divider);
+  font-size: 12px;
+  color: var(--fg);
+}
+.banner[hidden] { display: none; }
+.banner-dot {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: var(--warn);
+  flex: 0 0 6px;
+}
+.banner strong {
+  font-weight: 600;
+}
+
 .app-body {
   padding: 14px;
 }
@@ -70,10 +100,61 @@ html, body {
   display: inline-block;
   flex: 0 0 8px;
 }
+body[data-gbf="on"] .status { color: var(--ready); }
+body[data-gbf="on"] .status-dot { background: var(--ready); }
 .status-hint {
-  margin: 0;
+  margin: 0 0 12px;
   color: var(--muted);
   font-size: 12px;
+}
+
+.actions {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 6px;
+  margin-top: 4px;
+}
+.action {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 2px;
+  padding: 10px 12px;
+  background: var(--surface);
+  color: var(--fg);
+  border: 1px solid var(--divider);
+  border-radius: 6px;
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+  transition: background 120ms ease, border-color 120ms ease;
+}
+.action:hover:not([disabled]),
+.action:focus-visible:not([disabled]) {
+  background: var(--surface-hover);
+  border-color: var(--accent);
+  outline: none;
+}
+.action[disabled] {
+  opacity: 0.55;
+  cursor: not-allowed;
+}
+.action-label {
+  font-size: 12px;
+  font-weight: 600;
+}
+.action-meta {
+  font-size: 10px;
+  color: var(--muted);
+  font-variant-numeric: tabular-nums;
+  letter-spacing: 0.4px;
+}
+
+.action-notice {
+  min-height: 14px;
+  margin: 8px 0 0;
+  color: var(--muted);
+  font-size: 11px;
 }
 
 .app-footer {

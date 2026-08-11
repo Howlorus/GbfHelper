@@ -1,0 +1,10 @@
+{
+  "name": "gbf-copilot",
+  "private": true,
+  "version": "0.0.1",
+  "description": "Local-first browser extension for Granblue Fantasy raid preparation.",
+  "type": "module",
+  "scripts": {
+    "test": "node --test \"tests/**/*.test.js\""
+  }
+}

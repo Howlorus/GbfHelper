@@ -1,0 +1,9 @@
+{
+  "schemaVersion": 1,
+  "hosts": [
+    {
+      "origin": "https://game.granbluefantasy.jp",
+      "pathPrefix": "/"
+    }
+  ]
+}

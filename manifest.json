@@ -20,7 +20,9 @@
     "type": "module"
   },
 
-  "permissions": ["storage"],
+  "permissions": ["storage", "activeTab"],
 
-  "host_permissions": []
+  "host_permissions": ["https://game.granbluefantasy.jp/*"],
+
+  "web_accessible_resources": []
 }
