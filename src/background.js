@@ -6,12 +6,19 @@ import { STATES, reduce, initialState, isSessionActive, sessionMeta, EVENTS } fr
 import { urlMatchesAllowlist } from "./lib/host-check.js";
 import { CaptureRegistry } from "./lib/capture-registry.js";
 import { acceptPayload, initialProgress } from "./lib/scan-progress.js";
+import { parsePayload } from "./lib/parsers/index.js";
+import "./lib/parsers/characters.js";
 
 const BADGE_BG = "#e0a020";
 const BADGE_FG = "#101010";
 
 const STATE_KEY = "state";
 const SCAN_PROGRESS_KEY = "scanProgress";
+const SCAN_BUFFER_KEY = "scanBuffer";
+
+function initialScanBuffer() {
+  return { characters: [], weapons: [], summons: [], teams: [], parserStatus: {}, warnings: [] };
+}
 
 // One registry per service-worker lifetime. When the SW dies, in-memory
 // adapters die with it (there is no live buffer to leak). When a session
@@ -49,11 +56,14 @@ async function dispatch(action) {
       const failures = results.filter((r) => !r.ok).length;
       console.log(`[GBF Copilot] detached ${results.length} adapter(s) in ${durationMs}ms (${failures} failed)`);
     }
-    // Scan progress lifecycle: seed on entry, clear on any exit from scan.
+    // Scan progress + record buffer lifecycle: seed on entry, clear on exit.
     if (current.state !== STATES.ACCOUNT_SCAN_ACTIVE && next.state === STATES.ACCOUNT_SCAN_ACTIVE) {
-      await chrome.storage.session.set({ [SCAN_PROGRESS_KEY]: initialProgress() });
+      await chrome.storage.session.set({
+        [SCAN_PROGRESS_KEY]: initialProgress(),
+        [SCAN_BUFFER_KEY]: initialScanBuffer(),
+      });
     } else if (current.state === STATES.ACCOUNT_SCAN_ACTIVE && next.state !== STATES.ACCOUNT_SCAN_ACTIVE) {
-      await chrome.storage.session.remove(SCAN_PROGRESS_KEY);
+      await chrome.storage.session.remove([SCAN_PROGRESS_KEY, SCAN_BUFFER_KEY]);
     }
     await updateBadge(next);
   }
@@ -139,9 +149,23 @@ chrome.runtime.onConnect.addListener((port) => {
 async function onCapturePayload(payload) {
   const state = await getState();
   if (state.state !== STATES.ACCOUNT_SCAN_ACTIVE) return; // AC4
-  const { [SCAN_PROGRESS_KEY]: current } = await chrome.storage.session.get(SCAN_PROGRESS_KEY);
-  const next = acceptPayload(current, payload);
-  await chrome.storage.session.set({ [SCAN_PROGRESS_KEY]: next });
+
+  const store = await chrome.storage.session.get([SCAN_PROGRESS_KEY, SCAN_BUFFER_KEY]);
+  const nextProgress = acceptPayload(store[SCAN_PROGRESS_KEY], payload);
+
+  // Parse into records and append to the appropriate purpose bucket.
+  const buffer = store[SCAN_BUFFER_KEY] || initialScanBuffer();
+  const { records, warnings, status } = parsePayload(payload.purpose, payload.body);
+  if (buffer[payload.purpose]) {
+    buffer[payload.purpose] = buffer[payload.purpose].concat(records);
+  }
+  buffer.parserStatus = { ...buffer.parserStatus, [payload.purpose]: status };
+  if (warnings.length) buffer.warnings = buffer.warnings.concat(warnings.map((w) => `${payload.purpose}: ${w}`));
+
+  await chrome.storage.session.set({
+    [SCAN_PROGRESS_KEY]: nextProgress,
+    [SCAN_BUFFER_KEY]: buffer,
+  });
 }
 
 chrome.runtime.onMessage.addListener((msg, _sender, sendResponse) => {
