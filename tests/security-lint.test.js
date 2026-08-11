@@ -76,6 +76,26 @@ test("no inline event handlers (on*=) in extension HTML", async () => {
   assert.equal(findings.length, 0, `Inline handlers:\n${findings.join("\n")}`);
 });
 
+test("src/lib/*.js must not import chrome APIs (Port abstraction rule)", async () => {
+  const libDir = join(SRC, "lib");
+  const files = (await walk(libDir)).filter((f) => extname(f) === ".js");
+  const findings = [];
+  for (const file of files) {
+    // Strip comments before scanning: chrome.* mentioned in prose is OK.
+    const stripped = (await readFile(file, "utf8"))
+      .replace(/\/\*[\s\S]*?\*\//g, "")      // /* block comments */
+      .split(/\r?\n/)
+      .map((l) => l.replace(/\/\/.*$/, "")); // // line comments
+    stripped.forEach((line, i) => {
+      if (line.includes(ALLOW_MARKER)) return;
+      if (/\bchrome\.\w+/.test(line)) {
+        findings.push(`${file}:${i + 1}  chrome.* usage in domain-adjacent lib\n    ${line.trim()}`);
+      }
+    });
+  }
+  assert.equal(findings.length, 0, `chrome.* in src/lib:\n${findings.join("\n")}`);
+});
+
 test("manifest CSP forbids inline scripts, eval, and remote script origins", async () => {
   const m = JSON.parse(await readFile(MANIFEST, "utf8"));
   const csp = m.content_security_policy?.extension_pages;

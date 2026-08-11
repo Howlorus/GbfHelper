@@ -20,6 +20,8 @@
     "type": "module"
   },
 
+  "devtools_page": "src/devtools/devtools.html",
+
   "permissions": ["storage", "activeTab"],
 
   "host_permissions": ["https://game.granbluefantasy.jp/*"],

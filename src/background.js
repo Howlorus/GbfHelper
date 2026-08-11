@@ -93,6 +93,39 @@ if (chrome.runtime.onSuspend) {
   });
 }
 
+// Capture adapters (currently: DevTools page) connect via chrome.runtime.connect
+// with a port name prefixed "capture:". Each connected port becomes an entry
+// in the CaptureRegistry — detachAll broadcasts STOP_CAPTURE.
+chrome.runtime.onConnect.addListener((port) => {
+  if (!port?.name?.startsWith("capture:")) return;
+  const adapterId = port.name;
+  try {
+    captureRegistry.register(adapterId, () => new Promise((resolve) => {
+      try { port.postMessage({ type: "STOP_CAPTURE" }); } catch {}
+      try { port.disconnect(); } catch {}
+      resolve();
+    }));
+    console.log(`[GBF Copilot] capture adapter connected: ${adapterId}`);
+  } catch (err) {
+    console.warn(`[GBF Copilot] adapter register failed:`, err);
+    try { port.disconnect(); } catch {}
+    return;
+  }
+  port.onDisconnect.addListener(() => {
+    if (captureRegistry.has(adapterId)) {
+      captureRegistry.unregister(adapterId);
+      console.log(`[GBF Copilot] capture adapter disconnected: ${adapterId}`);
+    }
+  });
+  port.onMessage.addListener((msg) => {
+    if (msg?.type === "PAYLOAD" && msg.payload) {
+      // Sink: for now, log. Domain consumers (E02, E09) subscribe later.
+      console.log("[GBF Copilot] observed:",
+        msg.payload.method, msg.payload.url, `(${msg.payload.purpose})`);
+    }
+  });
+});
+
 chrome.runtime.onMessage.addListener((msg, _sender, sendResponse) => {
   (async () => {
     try {

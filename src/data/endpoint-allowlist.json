@@ -1,0 +1,10 @@
+{
+  "schemaVersion": 1,
+  "note": "Placeholder patterns. Feasibility slice (§49 Q1, Q11) will pin the exact GBF paths per inventory category. Anything not matching a pattern is dropped before it reaches the domain layer.",
+  "endpoints": [
+    { "pathPattern": "/npc/", "purpose": "characters" },
+    { "pathPattern": "/weapon/", "purpose": "weapons" },
+    { "pathPattern": "/summon/", "purpose": "summons" },
+    { "pathPattern": "/party/", "purpose": "teams" }
+  ]
+}
