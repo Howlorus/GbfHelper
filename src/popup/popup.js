@@ -1,12 +1,29 @@
 import { urlMatchesAllowlist } from "../lib/host-check.js";
-import { STATES, EVENTS, isSessionActive } from "../lib/state-machine.js";
+import { STATES, EVENTS, isSessionActive, sessionMeta } from "../lib/state-machine.js";
 
-const SESSION_LABELS = {
-  [STATES.ACCOUNT_SCAN_ACTIVE]: "Account Scan",
-  [STATES.CALIBRATION_SESSION_ACTIVE]: "Calibration Session",
-  [STATES.RAID_SESSION_ACTIVE]: "Raid Session",
-  [STATES.KNOWLEDGE_UPDATE_ACTIVE]: "Knowledge Update",
-};
+function fmtDuration(ms) {
+  const s = Math.max(0, Math.floor(ms / 1000));
+  const hh = Math.floor(s / 3600);
+  const mm = Math.floor((s % 3600) / 60);
+  const ss = s % 60;
+  const pad = (n) => String(n).padStart(2, "0");
+  return hh > 0 ? `${hh}:${pad(mm)}:${pad(ss)}` : `${mm}:${pad(ss)}`;
+}
+
+let durationTimer = null;
+function stopDurationTimer() {
+  if (durationTimer != null) {
+    clearInterval(durationTimer);
+    durationTimer = null;
+  }
+}
+function startDurationTimer(since) {
+  stopDurationTimer();
+  const el = document.getElementById("session-duration");
+  const tick = () => { el.textContent = fmtDuration(Date.now() - since); };
+  tick();
+  durationTimer = setInterval(tick, 1000);
+}
 
 const versionEl = document.getElementById("version");
 if (versionEl) versionEl.textContent = "v" + chrome.runtime.getManifest().version;
@@ -58,16 +75,18 @@ function showActions(state, { onGbf }) {
   const notice = document.getElementById("action-notice");
 
   if (isSessionActive(state)) {
+    const meta = sessionMeta(state);
     actions.hidden = true;
     panel.hidden = false;
-    document.getElementById("session-panel-name").textContent =
-      SESSION_LABELS[state.state] || state.state;
-    document.getElementById("session-panel-meta").textContent =
-      state.tabTitle ? `Tab: ${state.tabTitle}` : "";
+    document.getElementById("session-panel-name").textContent = meta?.kind || state.state;
+    document.getElementById("session-tab").textContent = state.tabTitle || "—";
+    document.getElementById("session-category").textContent = meta?.category || "—";
+    if (state.since) startDurationTimer(state.since);
     notice.textContent = "";
     return;
   }
 
+  stopDurationTimer();
   actions.hidden = false;
   panel.hidden = true;
   for (const btn of actions.querySelectorAll(".action")) {

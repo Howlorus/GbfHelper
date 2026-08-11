@@ -37,6 +37,23 @@ export function isSessionActive(s) {
   return !!s && SESSION_STATES.has(s.state);
 }
 
+// User-facing metadata per session type. Refined later by domain US
+// (e.g. E02 will replace "inventory" with the specific page being scanned).
+export function sessionMeta(s) {
+  switch (s?.state) {
+    case STATES.ACCOUNT_SCAN_ACTIVE:
+      return { kind: "Account Scan", category: "inventory", badge: "SCAN" };
+    case STATES.CALIBRATION_SESSION_ACTIVE:
+      return { kind: "Calibration Session", category: "battle events", badge: "CAL" };
+    case STATES.RAID_SESSION_ACTIVE:
+      return { kind: "Raid Session", category: "battle events", badge: "RAID" };
+    case STATES.KNOWLEDGE_UPDATE_ACTIVE:
+      return { kind: "Knowledge Update", category: "pack updates", badge: "UPD" };
+    default:
+      return null;
+  }
+}
+
 // reduce is pure: same input -> same output. The clock is injectable for tests.
 export function reduce(current, action, { now = () => Date.now() } = {}) {
   const cs = current || initialState();

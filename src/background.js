@@ -2,8 +2,11 @@
 // Persistence: chrome.storage.session — cleared on browser restart, so the
 // machine always boots to Disabled (§43 "no session auto-resumes").
 
-import { reduce, initialState, isSessionActive, EVENTS } from "./lib/state-machine.js";
+import { reduce, initialState, isSessionActive, sessionMeta, EVENTS } from "./lib/state-machine.js";
 import { urlMatchesAllowlist } from "./lib/host-check.js";
+
+const BADGE_BG = "#e0a020";
+const BADGE_FG = "#101010";
 
 const STATE_KEY = "state";
 
@@ -33,9 +36,30 @@ async function dispatch(action) {
   await setState(next);
   if (next.state !== current.state) {
     console.log("[GBF Copilot] state:", current.state, "->", next.state, "on", action.type);
+    await updateBadge(next);
   }
   return next;
 }
+
+async function updateBadge(state) {
+  const meta = sessionMeta(state);
+  if (!meta) {
+    await chrome.action.setBadgeText({ text: "" });
+    await chrome.action.setTitle({ title: "GBF Copilot" });
+    return;
+  }
+  await chrome.action.setBadgeText({ text: meta.badge });
+  await chrome.action.setBadgeBackgroundColor({ color: BADGE_BG });
+  if (chrome.action.setBadgeTextColor) {
+    await chrome.action.setBadgeTextColor({ color: BADGE_FG });
+  }
+  const on = state.tabTitle ? ` on ${state.tabTitle}` : "";
+  await chrome.action.setTitle({ title: `GBF Copilot — ${meta.kind}${on}` });
+}
+
+// Sync badge with persisted state on every service-worker cold start.
+getState().then(updateBadge).catch((err) =>
+  console.warn("[GBF Copilot] initial badge sync failed:", err));
 
 chrome.runtime.onMessage.addListener((msg, _sender, sendResponse) => {
   (async () => {

@@ -47,9 +47,16 @@
       <section class="session-panel" id="session-panel" hidden aria-live="polite">
         <p class="session-panel-label">
           <span class="session-panel-dot" aria-hidden="true"></span>
-          Session active: <strong id="session-panel-name"></strong>
+          <strong id="session-panel-name">Session</strong>
         </p>
-        <p class="session-panel-meta" id="session-panel-meta"></p>
+        <dl class="session-panel-facts">
+          <dt>Tab</dt>
+          <dd id="session-tab">—</dd>
+          <dt>Category</dt>
+          <dd id="session-category">—</dd>
+          <dt>Duration</dt>
+          <dd id="session-duration" aria-live="off" aria-atomic="true">0:00</dd>
+        </dl>
         <button type="button" class="stop-button" id="stop-button">Stop session</button>
       </section>
 
