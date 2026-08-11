@@ -1,0 +1,26 @@
+{
+  "manifest_version": 3,
+  "name": "GBF Copilot",
+  "version": "0.0.1",
+  "description": "Local-first assistant for Granblue Fantasy raid preparation, calibration, and review. Passive observation only, no automation.",
+  "minimum_chrome_version": "116",
+
+  "action": {
+    "default_title": "GBF Copilot",
+    "default_popup": "src/popup/popup.html"
+  },
+
+  "options_ui": {
+    "page": "src/options/options.html",
+    "open_in_tab": false
+  },
+
+  "background": {
+    "service_worker": "src/background.js",
+    "type": "module"
+  },
+
+  "permissions": ["storage"],
+
+  "host_permissions": []
+}
