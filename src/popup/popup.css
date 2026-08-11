@@ -213,6 +213,51 @@ body[data-gbf="on"] .status-dot { background: var(--ready); }
 #session-duration {
   font-variant-numeric: tabular-nums;
 }
+
+.scan-progress[hidden] { display: none; }
+.scan-progress {
+  padding: 8px 0 0;
+  border-top: 1px dashed var(--divider);
+}
+.scan-progress-title {
+  margin: 0 0 6px;
+  font-size: 11px;
+  text-transform: uppercase;
+  letter-spacing: 0.6px;
+  color: var(--muted);
+  font-weight: 600;
+}
+.scan-progress-facts {
+  display: grid;
+  grid-template-columns: 82px 1fr;
+  gap: 4px 8px;
+  margin: 0;
+  font-size: 12px;
+}
+.scan-progress-facts dt {
+  color: var(--muted);
+  font-weight: 500;
+}
+.scan-progress-facts dd {
+  margin: 0;
+  color: var(--fg);
+  font-variant-numeric: tabular-nums;
+}
+.scan-last[hidden] { display: none; }
+.scan-last {
+  margin: 6px 0 0;
+  font-size: 11px;
+  color: var(--muted);
+  overflow-wrap: anywhere;
+}
+.scan-last-ago { color: var(--muted); }
+.scan-hint {
+  margin: 6px 0 0;
+  font-size: 11px;
+  color: var(--muted);
+  font-style: italic;
+}
+
 .stop-button {
   align-self: stretch;
   padding: 8px 12px;

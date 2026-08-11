@@ -2,14 +2,16 @@
 // Persistence: chrome.storage.session — cleared on browser restart, so the
 // machine always boots to Disabled (§43 "no session auto-resumes").
 
-import { reduce, initialState, isSessionActive, sessionMeta, EVENTS } from "./lib/state-machine.js";
+import { STATES, reduce, initialState, isSessionActive, sessionMeta, EVENTS } from "./lib/state-machine.js";
 import { urlMatchesAllowlist } from "./lib/host-check.js";
 import { CaptureRegistry } from "./lib/capture-registry.js";
+import { acceptPayload, initialProgress } from "./lib/scan-progress.js";
 
 const BADGE_BG = "#e0a020";
 const BADGE_FG = "#101010";
 
 const STATE_KEY = "state";
+const SCAN_PROGRESS_KEY = "scanProgress";
 
 // One registry per service-worker lifetime. When the SW dies, in-memory
 // adapters die with it (there is no live buffer to leak). When a session
@@ -46,6 +48,12 @@ async function dispatch(action) {
       const { durationMs, results } = await captureRegistry.detachAll();
       const failures = results.filter((r) => !r.ok).length;
       console.log(`[GBF Copilot] detached ${results.length} adapter(s) in ${durationMs}ms (${failures} failed)`);
+    }
+    // Scan progress lifecycle: seed on entry, clear on any exit from scan.
+    if (current.state !== STATES.ACCOUNT_SCAN_ACTIVE && next.state === STATES.ACCOUNT_SCAN_ACTIVE) {
+      await chrome.storage.session.set({ [SCAN_PROGRESS_KEY]: initialProgress() });
+    } else if (current.state === STATES.ACCOUNT_SCAN_ACTIVE && next.state !== STATES.ACCOUNT_SCAN_ACTIVE) {
+      await chrome.storage.session.remove(SCAN_PROGRESS_KEY);
     }
     await updateBadge(next);
   }
@@ -119,12 +127,22 @@ chrome.runtime.onConnect.addListener((port) => {
   });
   port.onMessage.addListener((msg) => {
     if (msg?.type === "PAYLOAD" && msg.payload) {
-      // Sink: for now, log. Domain consumers (E02, E09) subscribe later.
       console.log("[GBF Copilot] observed:",
         msg.payload.method, msg.payload.url, `(${msg.payload.purpose})`);
+      // Domain sink: accumulate scan progress only when a scan is active (AC4).
+      onCapturePayload(msg.payload).catch((err) =>
+        console.warn("[GBF Copilot] scan sink failed:", err));
     }
   });
 });
+
+async function onCapturePayload(payload) {
+  const state = await getState();
+  if (state.state !== STATES.ACCOUNT_SCAN_ACTIVE) return; // AC4
+  const { [SCAN_PROGRESS_KEY]: current } = await chrome.storage.session.get(SCAN_PROGRESS_KEY);
+  const next = acceptPayload(current, payload);
+  await chrome.storage.session.set({ [SCAN_PROGRESS_KEY]: next });
+}
 
 chrome.runtime.onMessage.addListener((msg, _sender, sendResponse) => {
   (async () => {

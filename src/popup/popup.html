@@ -57,6 +57,24 @@
           <dt>Duration</dt>
           <dd id="session-duration" aria-live="off" aria-atomic="true">0:00</dd>
         </dl>
+
+        <section class="scan-progress" id="scan-progress" hidden>
+          <h2 class="scan-progress-title">Progress</h2>
+          <dl class="scan-progress-facts">
+            <dt>Characters</dt><dd><span id="scan-count-characters">0</span> · <span id="scan-status-characters">not started</span></dd>
+            <dt>Weapons</dt><dd><span id="scan-count-weapons">0</span> · <span id="scan-status-weapons">not started</span></dd>
+            <dt>Summons</dt><dd><span id="scan-count-summons">0</span> · <span id="scan-status-summons">not started</span></dd>
+            <dt>Teams</dt><dd><span id="scan-count-teams">0</span> · <span id="scan-status-teams">not started</span></dd>
+          </dl>
+          <p class="scan-last" id="scan-last" hidden>
+            Last: <span id="scan-last-path">—</span>
+            <span class="scan-last-ago" id="scan-last-ago"></span>
+          </p>
+          <p class="scan-hint" id="scan-hint">
+            Open DevTools (F12) on the GBF tab so payloads can be observed.
+          </p>
+        </section>
+
         <button type="button" class="stop-button" id="stop-button">Stop session</button>
       </section>
 
