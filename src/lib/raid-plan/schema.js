@@ -1,24 +1,33 @@
-// Raid Plan record (§9.1/§9.2). Central product object. Flat shape so
-// IndexedDB range queries + envelope wrapping stay simple.
+// Raid Plan record (§9.1/§9.2). Storage id encodes the version:
+//   id = `${planId}@v${raidPlanVersion}`
+// so every version is a distinct record. planId groups the family;
+// raidPlanVersion orders them. §9.1 domain fields default nullable until
+// a producer fills them (E08/E10/E14).
 
 export const RAID_PLAN_STATUSES = Object.freeze(["draft", "current", "variant", "archived"]);
 
-const REQUIRED = ["id", "raidId", "element", "objective", "raidPlanVersion", "status"];
+export function storageId(planId, version) {
+  return `${planId}@v${version}`;
+}
 
-// Build a fresh plan record. Callers supply the required fields; anything
-// missing gets a null so the shape stays uniform (no undefined leaks into
-// storage / envelope wrapping).
+export function parseStorageId(id) {
+  const m = /^(.+)@v(\d+)$/.exec(String(id || ""));
+  return m ? { planId: m[1], version: +m[2] } : null;
+}
+
 export function buildRaidPlan(input) {
   if (!input || typeof input !== "object") throw new TypeError("input must be an object");
+  if (typeof input.planId !== "string" || !input.planId) throw new TypeError("input.planId required");
+  const version = input.raidPlanVersion || 1;
   const out = {
-    id: input.id,
+    id: storageId(input.planId, version),
+    planId: input.planId,
+    raidPlanVersion: version,
     raidId: input.raidId,
     element: input.element,
     objective: input.objective,
-    raidPlanVersion: input.raidPlanVersion || 1,
-    status: input.status || "draft",
+    status: input.status || "current",
 
-    // §9.1 domain fields — nullable until the producer that fills them ships.
     party: input.party ?? [],
     backline: input.backline ?? [],
     mainClass: input.mainClass ?? null,
@@ -36,13 +45,11 @@ export function buildRaidPlan(input) {
     resourceConservationRules: input.resourceConservationRules ?? [],
     fallbackRules: input.fallbackRules ?? [],
 
-    // Provenance references.
     sourceStrategyPackId: input.sourceStrategyPackId ?? null,
     sourceStrategyPackVersion: input.sourceStrategyPackVersion ?? null,
 
-    // Audit trail — every version records where the change came from.
     changeSource: input.changeSource || "user-edit",
-    previousVersionId: input.previousVersionId ?? null,
+    previousVersion: input.previousVersion ?? null,
   };
   validateRaidPlan(out);
   return out;
@@ -50,7 +57,7 @@ export function buildRaidPlan(input) {
 
 export function validateRaidPlan(rec) {
   if (!rec || typeof rec !== "object") throw new TypeError("raid plan must be an object");
-  for (const k of REQUIRED) {
+  for (const k of ["id", "planId", "raidId", "element", "objective", "raidPlanVersion", "status"]) {
     if (rec[k] === undefined || rec[k] === null || rec[k] === "") {
       throw new TypeError(`raid plan.${k} required`);
     }

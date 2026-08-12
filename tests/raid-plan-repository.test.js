@@ -3,71 +3,105 @@ import assert from "node:assert/strict";
 import { InMemoryRepository } from "../src/lib/repositories/in-memory.js";
 import { STORE_NAMES } from "../src/lib/stores.js";
 import { wrapWithValidation } from "../src/lib/corruption.js";
-import { savePlan, duplicatePlan, archivePlan, getPlan, listPlans } from "../src/lib/raid-plan/repository.js";
+import {
+  saveNewVersion, duplicatePlan, archivePlan, revertToVersion,
+  getCurrentPlan, listVersions, listCurrentPlans,
+} from "../src/lib/raid-plan/repository.js";
 
-function newRepo() {
-  return wrapWithValidation(new InMemoryRepository(STORE_NAMES));
-}
-function goodInput() {
-  return { id: "plan-1", raidId: "bahamut-proud", element: "dark", objective: "first-clear" };
-}
+function newRepo() { return wrapWithValidation(new InMemoryRepository(STORE_NAMES)); }
+function goodInput() { return { planId: "plan-1", raidId: "bahamut-proud", element: "dark", objective: "first-clear" }; }
 
-test("savePlan writes an envelope-wrapped raid plan into the raidPlans store", async () => {
+test("first saveNewVersion writes v1 with no previousVersion", async () => {
   const r = newRepo();
-  const rec = await savePlan(r, goodInput(), { now: 100 });
-  assert.equal(rec.id, "plan-1");
+  const rec = await saveNewVersion(r, goodInput(), { now: 100 });
+  assert.equal(rec.id, "plan-1@v1");
   assert.equal(rec.raidPlanVersion, 1);
-  assert.equal(rec.createdAt, 100);
-  assert.equal(rec.updatedAt, 100);
-  assert.deepEqual(await getPlan(r, "plan-1"), rec);
+  assert.equal(rec.previousVersion, null);
 });
 
-test("savePlan on an existing plan preserves createdAt and refreshes updatedAt", async () => {
+test("subsequent saveNewVersion increments and stamps previousVersion", async () => {
   const r = newRepo();
-  await savePlan(r, goodInput(), { now: 100 });
-  const updated = await savePlan(r, { ...goodInput(), objective: "safe-solo" }, { now: 200 });
-  assert.equal(updated.createdAt, 100);
-  assert.equal(updated.updatedAt, 200);
-  assert.equal(updated.objective, "safe-solo");
+  await saveNewVersion(r, goodInput(), { now: 100 });
+  const v2 = await saveNewVersion(r, { ...goodInput(), objective: "safe-solo" }, { now: 200 });
+  assert.equal(v2.id, "plan-1@v2");
+  assert.equal(v2.raidPlanVersion, 2);
+  assert.equal(v2.previousVersion, 1);
+  assert.equal(v2.objective, "safe-solo");
 });
 
-test("duplicatePlan copies content, resets version, marks status=variant + source=duplicated", async () => {
+test("getCurrentPlan returns the highest-version record", async () => {
   const r = newRepo();
-  await savePlan(r, { ...goodInput(), party: ["char.zeta"] }, { now: 100 });
-  const dup = await duplicatePlan(r, "plan-1", { newId: "plan-2", now: 200 });
-  assert.equal(dup.id, "plan-2");
-  assert.equal(dup.status, "variant");
+  await saveNewVersion(r, goodInput());
+  await saveNewVersion(r, goodInput());
+  await saveNewVersion(r, goodInput());
+  assert.equal((await getCurrentPlan(r, "plan-1")).raidPlanVersion, 3);
+});
+
+test("listVersions returns every version sorted newest-first", async () => {
+  const r = newRepo();
+  await saveNewVersion(r, goodInput());
+  await saveNewVersion(r, goodInput());
+  await saveNewVersion(r, goodInput());
+  const list = await listVersions(r, "plan-1");
+  assert.deepEqual(list.map((v) => v.raidPlanVersion), [3, 2, 1]);
+});
+
+test("duplicatePlan copies current version into new family at v1", async () => {
+  const r = newRepo();
+  await saveNewVersion(r, { ...goodInput(), party: ["char.zeta"] });
+  await saveNewVersion(r, { ...goodInput(), party: ["char.zeta", "char.vane"] });
+  const dup = await duplicatePlan(r, "plan-1", { newPlanId: "plan-2" });
+  assert.equal(dup.planId, "plan-2");
   assert.equal(dup.raidPlanVersion, 1);
+  assert.equal(dup.status, "variant");
   assert.equal(dup.changeSource, "duplicated");
-  assert.deepEqual(dup.party, ["char.zeta"]);
+  assert.deepEqual(dup.party, ["char.zeta", "char.vane"]);
 });
 
-test("duplicatePlan refuses without newId", async () => {
+test("archivePlan creates a new version with status=archived", async () => {
   const r = newRepo();
-  await savePlan(r, goodInput());
-  await assert.rejects(() => duplicatePlan(r, "plan-1", {}), /newId required/);
-});
-
-test("archivePlan sets status=archived and records the audit source", async () => {
-  const r = newRepo();
-  await savePlan(r, goodInput());
-  const arc = await archivePlan(r, "plan-1", { now: 300 });
+  await saveNewVersion(r, goodInput());
+  const arc = await archivePlan(r, "plan-1");
+  assert.equal(arc.raidPlanVersion, 2);
   assert.equal(arc.status, "archived");
   assert.equal(arc.changeSource, "archived");
 });
 
-test("listPlans filters by status and raidId", async () => {
+test("revertToVersion writes a new version with target's content and audit source", async () => {
   const r = newRepo();
-  await savePlan(r, { ...goodInput(), id: "p1", status: "current" });
-  await savePlan(r, { ...goodInput(), id: "p2", status: "variant" });
-  await savePlan(r, { ...goodInput(), id: "p3", raidId: "belial" });
-  assert.equal((await listPlans(r)).length, 3);
-  assert.equal((await listPlans(r, { status: "variant" })).length, 1);
-  assert.equal((await listPlans(r, { raidId: "belial" })).length, 1);
+  await saveNewVersion(r, { ...goodInput(), objective: "first-clear" });
+  await saveNewVersion(r, { ...goodInput(), objective: "safe-solo" });
+  const reverted = await revertToVersion(r, "plan-1", 1);
+  assert.equal(reverted.raidPlanVersion, 3);
+  assert.equal(reverted.objective, "first-clear");
+  assert.match(reverted.changeSource, /reverted-from-v1/);
 });
 
-test("archivePlan / duplicatePlan on missing id throws", async () => {
+test("revertToVersion on a missing target throws", async () => {
+  const r = newRepo();
+  await saveNewVersion(r, goodInput());
+  await assert.rejects(() => revertToVersion(r, "plan-1", 99), /version not found/);
+});
+
+test("listCurrentPlans returns one record per family + filters", async () => {
+  const r = newRepo();
+  await saveNewVersion(r, { ...goodInput() });
+  await saveNewVersion(r, { ...goodInput(), objective: "safe-solo" });
+  await saveNewVersion(r, { planId: "plan-2", raidId: "belial", element: "dark", objective: "first-clear" });
+  assert.equal((await listCurrentPlans(r)).length, 2);
+  const bp = await listCurrentPlans(r, { raidId: "bahamut-proud" });
+  assert.equal(bp.length, 1);
+  assert.equal(bp[0].raidPlanVersion, 2);
+});
+
+test("duplicatePlan refuses without newPlanId", async () => {
+  const r = newRepo();
+  await saveNewVersion(r, goodInput());
+  await assert.rejects(() => duplicatePlan(r, "plan-1", {}), /newPlanId required/);
+});
+
+test("archivePlan / duplicatePlan on a missing family throw", async () => {
   const r = newRepo();
   await assert.rejects(() => archivePlan(r, "nope"), /plan not found/);
-  await assert.rejects(() => duplicatePlan(r, "nope", { newId: "x" }), /plan not found/);
+  await assert.rejects(() => duplicatePlan(r, "nope", { newPlanId: "x" }), /plan not found/);
 });
