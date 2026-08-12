@@ -31,7 +31,6 @@ html, body { margin: 0; padding: 0; background: var(--bg); color: var(--fg);
 #match-btn { border-color: var(--accent); color: var(--accent); }
 
 .results { display: grid; gap: 20px; }
-.results.compare-mode { grid-template-columns: 1fr 1fr; }
 .pack-result { padding: 16px; background: var(--surface); border: 1px solid var(--divider); border-radius: 6px; }
 .pack-result h2 { margin: 0 0 4px; font-size: 15px; }
 .pack-result .overall { margin: 0 0 12px; font-size: 12px; color: var(--muted); }

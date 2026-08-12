@@ -6,12 +6,15 @@ function send(msg) {
   return new Promise((resolve) => chrome.runtime.sendMessage(msg, (r) => resolve(r)));
 }
 
+let cached = null;
 async function loadState() {
+  if (cached) return cached;
   const [inventory, packs] = await Promise.all([
     send({ type: "GET_INVENTORY" }),
     send({ type: "GET_STRATEGY_PACKS" }),
   ]);
-  return { inventory, packs: Array.isArray(packs) ? packs : [] };
+  cached = { inventory, packs: Array.isArray(packs) ? packs : [] };
+  return cached;
 }
 
 function stateClass(state) {
@@ -24,7 +27,7 @@ function renderDimensionList(title, items) {
   const li = items.map((it) => `
     <li class="dim-item">
       <span>
-        <span class="role">${escapeHtml(it.role || it.name || "—")}</span>
+        <span class="role">${escapeHtml(it.role || "—")}</span>
         <span class="entity">${escapeHtml(it.entityId || "")}</span>
       </span>
       <span class="state ${stateClass(it.state)}">${escapeHtml(it.state)}</span>
@@ -68,7 +71,6 @@ function renderPackResult(pack, strategy, inventory) {
       ${renderDimensionList("Characters", match.dimensions.characters)}
       ${renderDimensionList("Weapons", match.dimensions.weapons)}
       ${renderDimensionList("Summons", match.dimensions.summons)}
-      ${renderDimensionList("Classes", match.dimensions.classes)}
       ${renderSubstitutions(strategy, missing, inventory)}
     </article>
   `;
@@ -76,21 +78,13 @@ function renderPackResult(pack, strategy, inventory) {
 
 async function runMatch() {
   const { inventory, packs } = await loadState();
-  const packEl = document.getElementById("pack-select");
-  const compareMode = document.getElementById("results").classList.contains("compare-mode");
-  const chosen = [...packEl.selectedOptions].map((o) => o.value);
+  const packId = document.getElementById("pack-select").value;
+  const pack = packs.find((p) => p.id === packId);
   const results = document.getElementById("results");
   results.hidden = false;
-  const parts = [];
-  for (const packId of chosen.slice(0, compareMode ? 2 : 1)) {
-    const pack = packs.find((p) => p.id === packId);
-    if (!pack) continue;
-    // Strategy template lives in the pack's strategies.json / substitutions.json.
-    // For now the pack record must carry them as fields (E12 orchestrates loading).
-    const strategy = pack.strategy || { requirements: {}, substitutions: [] };
-    parts.push(renderPackResult(pack, strategy, inventory));
-  }
-  results.innerHTML = parts.join("") || "<p class='empty'>No strategies matched.</p>"; // gbf-lint-allow: innerHTML composed from escapeHtml'd substrings via a fixed template
+  if (!pack) { results.textContent = "No strategy pack selected."; return; }
+  const strategy = pack.strategy || { requirements: {}, substitutions: [] };
+  results.innerHTML = renderPackResult(pack, strategy, inventory); // gbf-lint-allow: innerHTML composed from escapeHtml'd substrings via a fixed template
 }
 
 async function init() {
@@ -101,18 +95,16 @@ async function init() {
 
   if (!inventory) {
     empty.hidden = false;
-    emptyMsg.textContent = "Scan your account first (popup -> Scan Account -> Save & stop).";
+    emptyMsg.textContent = "Scan your account first (popup → Scan Account → Save & stop).";
     return;
   }
   if (!packs.length) {
     empty.hidden = false;
-    emptyMsg.textContent = "No strategy pack installed. Install a pack via the Update Center (coming in E12).";
+    emptyMsg.textContent = "No strategy pack installed. Install one from the Update Center (E12).";
     return;
   }
 
   const select = document.getElementById("pack-select");
-  select.multiple = true;
-  select.size = Math.min(6, Math.max(2, packs.length));
   for (const p of packs) {
     const opt = document.createElement("option");
     opt.value = p.id;
@@ -120,13 +112,7 @@ async function init() {
     select.appendChild(opt);
   }
   controls.hidden = false;
-
   document.getElementById("match-btn").addEventListener("click", runMatch);
-  document.getElementById("compare-btn").addEventListener("click", () => {
-    const results = document.getElementById("results");
-    results.classList.toggle("compare-mode");
-    runMatch();
-  });
 }
 
 function escapeHtml(s) {
