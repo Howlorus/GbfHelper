@@ -20,6 +20,9 @@ import { wrapWithValidation, CorruptionError } from "./lib/corruption.js";
 import { prepareInstall, installPack } from "./lib/packs/install.js";
 import { planUpdate } from "./lib/update-center/plan.js";
 import { getPack, listPacks } from "./lib/packs/registry.js";
+import { tierOf } from "./lib/storage/tiers.js";
+import { planQuickCleanup, planAdvancedCleanup, planWipeAll, applyCleanup } from "./lib/storage/cleanup.js";
+import { buildBackup, restoreBackup } from "./lib/storage/backup.js";
 
 const repo = wrapWithValidation(new IndexedDBRepository({ stores: STORE_NAMES, version: 1 }));
 
@@ -183,6 +186,23 @@ async function commitInventory() {
   }
 }
 
+async function getStorageStats() {
+  const stats = {};
+  let quotaEstimate = null;
+  for (const store of STORE_NAMES) {
+    try {
+      const rows = await repo.list(store);
+      stats[store] = { count: rows.length, tier: tierOf(store) };
+    } catch (err) {
+      stats[store] = { count: null, tier: tierOf(store), error: String(err?.message || err) };
+    }
+  }
+  try {
+    if (navigator.storage?.estimate) quotaEstimate = await navigator.storage.estimate();
+  } catch { /* ignore */ }
+  return { stats, quota: quotaEstimate };
+}
+
 async function planUpdateFor(rawFiles) {
   const prepared = await prepareInstall(rawFiles);
   if (!prepared.ok) return { ok: false, errors: prepared.errors };
@@ -264,6 +284,23 @@ chrome.runtime.onMessage.addListener((msg, _sender, sendResponse) => {
         } catch (err) {
           sendResponse({ error: String(err?.message || err) });
         }
+      } else if (msg?.type === "GET_STORAGE_STATS") {
+        sendResponse(await getStorageStats());
+      } else if (msg?.type === "QUICK_CLEANUP") {
+        sendResponse(await applyCleanup(repo, planQuickCleanup()));
+      } else if (msg?.type === "ADVANCED_CLEANUP") {
+        const plan = planAdvancedCleanup(msg.stores || []);
+        if (plan.requireTypedConfirmation && msg.confirmation !== "DELETE") {
+          sendResponse({ ok: false, error: "typed confirmation required" });
+        } else sendResponse(await applyCleanup(repo, plan));
+      } else if (msg?.type === "WIPE_ALL") {
+        if (msg.confirmation !== "DELETE") {
+          sendResponse({ ok: false, error: "typed confirmation required" });
+        } else sendResponse(await applyCleanup(repo, planWipeAll(STORE_NAMES)));
+      } else if (msg?.type === "BUILD_BACKUP") {
+        sendResponse(await buildBackup(repo, { extensionVersion: chrome.runtime.getManifest().version }));
+      } else if (msg?.type === "RESTORE_BACKUP") {
+        sendResponse(await restoreBackup(repo, msg.bundle, { replace: !!msg.replace }));
       } else {
         sendResponse({ error: "unknown message" });
       }

@@ -1,0 +1,55 @@
+:root {
+  --bg: #14161a; --fg: #e6e8ec; --muted: #8a90a0; --accent: #6fb1ff;
+  --ready: #6bd6a0; --warn: #e0b060; --danger: #e07070;
+  --divider: #22262d; --surface: #1b1f26; --surface-hover: #22272f;
+}
+@media (prefers-color-scheme: light) {
+  :root { --bg: #ffffff; --fg: #14161a; --muted: #5c6370; --accent: #0057c2;
+    --ready: #128a4d; --warn: #a3620d; --danger: #b31414;
+    --divider: #e5e7eb; --surface: #f4f5f7; --surface-hover: #e9ebef; }
+}
+@media (prefers-reduced-motion: reduce) { * { animation: none !important; transition: none !important; } }
+
+html, body { margin: 0; padding: 0; background: var(--bg); color: var(--fg);
+  font: 14px/1.5 -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; }
+
+.app-header { padding: 20px 24px; border-bottom: 1px solid var(--divider); }
+.app-header h1 { margin: 0 0 4px; font-size: 18px; }
+.app-header .hint { margin: 0; color: var(--muted); font-size: 13px; }
+
+.app-body { padding: 20px 24px; max-width: 900px; }
+section { margin-bottom: 28px; }
+section h2 { margin: 0 0 6px; font-size: 14px; font-weight: 600; }
+.hint { color: var(--muted); font-size: 12px; margin: 4px 0 12px; }
+
+.quota { color: var(--muted); font-size: 12px; font-variant-numeric: tabular-nums; margin: 0 0 8px; }
+
+table.stats { width: 100%; border-collapse: collapse; font-size: 13px; }
+table.stats th, table.stats td { padding: 6px 8px; text-align: left; border-bottom: 1px solid var(--divider); }
+table.stats th { font-weight: 600; color: var(--muted); font-size: 11px; text-transform: uppercase; letter-spacing: 0.5px; }
+table.stats td.tier { font-size: 11px; text-transform: uppercase; letter-spacing: 0.4px; }
+td.tier[data-tier="critical"] { color: var(--warn); }
+td.tier[data-tier="rebuildable"] { color: var(--muted); }
+td.tier[data-tier="configurable"] { color: var(--fg); }
+td.count { font-variant-numeric: tabular-nums; text-align: right; }
+
+.row { display: flex; gap: 8px; flex-wrap: wrap; }
+button { padding: 8px 14px; background: var(--surface); color: var(--fg); border: 1px solid var(--divider);
+  border-radius: 4px; font: inherit; font-weight: 600; cursor: pointer; }
+button:hover, button:focus-visible { background: var(--surface-hover); border-color: var(--accent); outline: none; }
+button.danger { color: var(--danger); border-color: var(--danger); }
+button.danger:hover, button.danger:focus-visible { background: color-mix(in oklab, var(--danger) 15%, transparent); }
+button[disabled] { opacity: 0.55; cursor: not-allowed; }
+
+.notice { margin-top: 10px; min-height: 16px; font-size: 12px; color: var(--muted); }
+.notice.ok { color: var(--ready); }
+.notice.err { color: var(--danger); }
+
+dialog { border: 1px solid var(--divider); border-radius: 8px; background: var(--bg); color: var(--fg);
+  padding: 16px 20px; max-width: 400px; }
+dialog::backdrop { background: rgba(0, 0, 0, 0.5); }
+dialog h3 { margin: 0 0 8px; font-size: 14px; }
+dialog p { margin: 0 0 12px; color: var(--muted); font-size: 13px; }
+dialog input[type="text"] { display: block; margin-top: 4px; padding: 6px 8px; width: 100%; box-sizing: border-box;
+  background: var(--surface); border: 1px solid var(--divider); border-radius: 4px; color: var(--fg); font: inherit; }
+dialog menu { display: flex; gap: 8px; justify-content: flex-end; padding: 0; margin: 12px 0 0; }

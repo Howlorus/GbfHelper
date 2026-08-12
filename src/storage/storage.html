@@ -1,0 +1,65 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <title>GBF Copilot — Storage</title>
+    <link rel="stylesheet" href="storage.css" />
+  </head>
+  <body>
+    <header class="app-header">
+      <h1>Storage</h1>
+      <p class="hint">Everything is local. Nothing is uploaded.</p>
+    </header>
+
+    <main class="app-body">
+      <section>
+        <h2>Usage</h2>
+        <p id="quota" class="quota"></p>
+        <table class="stats" aria-label="Per-category storage">
+          <thead><tr><th>Category</th><th>Tier</th><th>Records</th></tr></thead>
+          <tbody id="stats-body"></tbody>
+        </table>
+      </section>
+
+      <section>
+        <h2>Cleanup</h2>
+        <p class="hint">Quick Cleanup only touches rebuildable data (indexes, source cache, diagnostics). Your account, plans, notes, calibration, and settings are protected by default.</p>
+        <div class="row">
+          <button type="button" id="quick-btn">Quick Cleanup</button>
+          <button type="button" id="wipe-btn" class="danger">Delete all local data</button>
+        </div>
+        <p id="cleanup-notice" class="notice" role="status" aria-live="polite"></p>
+      </section>
+
+      <section>
+        <h2>Backup &amp; Restore</h2>
+        <p class="hint">Backup produces a JSON file containing your critical + retention-controlled data. Restore reads it back and refuses any envelope-less record.</p>
+        <div class="row">
+          <button type="button" id="backup-btn">Download backup</button>
+          <label class="file-label">
+            <input type="file" id="restore-file" accept=".json" hidden />
+            <button type="button" id="restore-btn">Restore from file…</button>
+          </label>
+        </div>
+        <p id="backup-notice" class="notice" role="status" aria-live="polite"></p>
+      </section>
+
+      <dialog id="confirm-dialog">
+        <form method="dialog">
+          <h3 id="confirm-title">Confirm destructive action</h3>
+          <p id="confirm-body"></p>
+          <label id="confirm-input-label" hidden>
+            Type <strong>DELETE</strong> to confirm:
+            <input type="text" id="confirm-input" autocomplete="off" />
+          </label>
+          <menu>
+            <button value="cancel" id="confirm-cancel">Cancel</button>
+            <button value="confirm" id="confirm-ok" class="danger" disabled>Confirm</button>
+          </menu>
+        </form>
+      </dialog>
+    </main>
+
+    <script type="module" src="storage.js"></script>
+  </body>
+</html>
