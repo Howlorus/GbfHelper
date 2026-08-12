@@ -1,0 +1,33 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <title>GBF Copilot — Update Center</title>
+    <link rel="stylesheet" href="update-center.css" />
+  </head>
+  <body>
+    <header class="app-header">
+      <h1>Update Center</h1>
+      <p class="hint">Install and update Game Data, Strategy, and Terminology packs from a local bundle.</p>
+    </header>
+
+    <main class="app-body">
+      <section class="installed">
+        <h2>Installed packs</h2>
+        <ul id="installed-list" class="pack-list"></ul>
+        <p id="installed-empty" class="empty" hidden>No packs installed.</p>
+      </section>
+
+      <section class="install">
+        <h2>Install a pack</h2>
+        <p class="hint">Select all files of the pack bundle (manifest.json, checksums.json, plus the strategy pack's data files). No <code>.js</code>, <code>.wasm</code>, or <code>.html</code> allowed.</p>
+        <input type="file" id="file-input" multiple accept=".json" />
+        <div id="preview" class="preview" hidden></div>
+        <button type="button" id="apply-btn" hidden>Apply update</button>
+        <p id="notice" class="notice" role="status" aria-live="polite"></p>
+      </section>
+    </main>
+
+    <script type="module" src="update-center.js"></script>
+  </body>
+</html>

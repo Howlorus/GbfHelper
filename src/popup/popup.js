@@ -39,6 +39,11 @@ document.getElementById("open-planner")?.addEventListener("click", (e) => {
   chrome.tabs.create({ url: chrome.runtime.getURL("src/planner/planner.html") });
 });
 
+document.getElementById("open-update-center")?.addEventListener("click", (e) => {
+  e.preventDefault();
+  chrome.tabs.create({ url: chrome.runtime.getURL("src/update-center/update-center.html") });
+});
+
 async function loadAllowlist() {
   const url = chrome.runtime.getURL("src/data/host-allowlist.json");
   const res = await fetch(url);

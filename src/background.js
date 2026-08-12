@@ -17,6 +17,9 @@ import { IndexedDBRepository } from "./lib/repositories/idb.js";
 import { STORE_NAMES } from "./lib/stores.js";
 import { wrapEnvelope } from "./lib/envelope.js";
 import { wrapWithValidation, CorruptionError } from "./lib/corruption.js";
+import { prepareInstall, installPack } from "./lib/packs/install.js";
+import { planUpdate } from "./lib/update-center/plan.js";
+import { getPack, listPacks } from "./lib/packs/registry.js";
 
 const repo = wrapWithValidation(new IndexedDBRepository({ stores: STORE_NAMES, version: 1 }));
 
@@ -180,6 +183,32 @@ async function commitInventory() {
   }
 }
 
+async function planUpdateFor(rawFiles) {
+  const prepared = await prepareInstall(rawFiles);
+  if (!prepared.ok) return { ok: false, errors: prepared.errors };
+  const manifest = prepared.bundle["manifest.json"];
+  const kindToStore = { gameData: "gameData", strategy: "strategy", terminology: "terminology" };
+  const packKind = kindToStore[manifest.kind];
+  const currentPack = packKind ? await getPack(repo, packKind, manifest.id) : null;
+  return { ok: true, plan: planUpdate(currentPack, manifest), manifest };
+}
+
+async function applyUpdate(rawFiles) {
+  const prepared = await prepareInstall(rawFiles);
+  if (!prepared.ok) return { ok: false, errors: prepared.errors };
+  try {
+    const now = Date.now();
+    const extensionVersion = chrome.runtime.getManifest().version;
+    // installPack writes transactionally — a mid-write failure rolls back
+    // the whole install via the repo's transaction abort semantics (§43).
+    const record = await installPack(repo, prepared.bundle, { wrapEnvelope, now, extensionVersion });
+    return { ok: true, installed: { id: record.id, name: record.name, version: record.version, kind: record.kind } };
+  } catch (err) {
+    console.warn("[GBF Copilot] pack install failed:", err);
+    return { ok: false, error: String(err?.message || err) };
+  }
+}
+
 async function onCapturePayload(payload) {
   const state = await getState();
   if (state.state !== STATES.ACCOUNT_SCAN_ACTIVE) return; // AC4
@@ -222,6 +251,16 @@ chrome.runtime.onMessage.addListener((msg, _sender, sendResponse) => {
       } else if (msg?.type === "GET_STRATEGY_PACKS") {
         try {
           sendResponse((await repo.list("strategyPacks")).filter((p) => p.active !== false));
+        } catch (err) {
+          sendResponse({ error: String(err?.message || err) });
+        }
+      } else if (msg?.type === "PLAN_UPDATE") {
+        sendResponse(await planUpdateFor(msg.rawFiles));
+      } else if (msg?.type === "APPLY_UPDATE") {
+        sendResponse(await applyUpdate(msg.rawFiles));
+      } else if (msg?.type === "LIST_ALL_PACKS") {
+        try {
+          sendResponse(await listPacks(repo));
         } catch (err) {
           sendResponse({ error: String(err?.message || err) });
         }
