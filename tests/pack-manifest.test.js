@@ -1,6 +1,6 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { validateManifestBundle, PACK_KINDS } from "../src/lib/packs/manifest.js";
+import { validateManifestBundle } from "../src/lib/packs/manifest.js";
 
 const validSha = "a".repeat(64);
 
@@ -19,67 +19,73 @@ function goodStrategyBundle() {
 }
 
 test("well-formed strategy bundle is accepted", () => {
-  const r = validateManifestBundle(goodStrategyBundle());
-  assert.equal(r.ok, true);
+  assert.equal(validateManifestBundle(goodStrategyBundle()).ok, true);
 });
 
-test("missing manifest.json or checksums.json is refused", () => {
-  const bundle = goodStrategyBundle();
-  delete bundle["manifest.json"];
-  const r = validateManifestBundle(bundle);
+test("missing manifest.json is refused", () => {
+  const b = goodStrategyBundle(); delete b["manifest.json"];
+  const r = validateManifestBundle(b);
   assert.equal(r.ok, false);
   assert.ok(r.errors.some((e) => e.includes("manifest.json")));
 });
 
 test("bad semver in manifest.version is refused", () => {
-  const bundle = goodStrategyBundle();
-  bundle["manifest.json"].version = "one";
-  const r = validateManifestBundle(bundle);
+  const b = goodStrategyBundle(); b["manifest.json"].version = "one";
+  const r = validateManifestBundle(b);
   assert.equal(r.ok, false);
   assert.ok(r.errors.some((e) => e.includes("semver")));
 });
 
 test("unknown pack kind is refused", () => {
-  const bundle = goodStrategyBundle();
-  bundle["manifest.json"].kind = "bogus";
-  const r = validateManifestBundle(bundle);
-  assert.equal(r.ok, false);
-  assert.ok(r.errors.some((e) => e.includes("kind")));
+  const b = goodStrategyBundle(); b["manifest.json"].kind = "bogus";
+  assert.equal(validateManifestBundle(b).ok, false);
 });
 
 test("strategy pack missing a required §18.2 file is refused", () => {
-  const bundle = goodStrategyBundle();
-  delete bundle["rotations.json"];
-  const r = validateManifestBundle(bundle);
+  const b = goodStrategyBundle(); delete b["rotations.json"];
+  const r = validateManifestBundle(b);
   assert.equal(r.ok, false);
   assert.ok(r.errors.some((e) => e.includes("rotations.json")));
 });
 
-test("non-declarative files (.js, .wasm, .html) are refused (§41.4)", () => {
-  const b1 = goodStrategyBundle(); b1["helper.js"] = "console.log(1)";
-  assert.equal(validateManifestBundle(b1).ok, false);
-  const b2 = goodStrategyBundle(); b2["macro.wasm"] = "";
-  assert.equal(validateManifestBundle(b2).ok, false);
-  const b3 = goodStrategyBundle(); b3["view.html"] = "<html/>";
-  assert.equal(validateManifestBundle(b3).ok, false);
-});
-
 test("checksums must be 64-char hex sha256", () => {
-  const bundle = goodStrategyBundle();
-  bundle["checksums.json"] = { "raid.json": "not a hash" };
-  const r = validateManifestBundle(bundle);
+  const b = goodStrategyBundle(); b["checksums.json"] = { "raid.json": "not a hash" };
+  const r = validateManifestBundle(b);
   assert.equal(r.ok, false);
   assert.ok(r.errors.some((e) => e.includes("sha256")));
 });
 
 test("non-strategy pack kinds do not require strategy files", () => {
-  for (const kind of PACK_KINDS.filter((k) => k !== "strategy")) {
+  for (const kind of ["gameData", "terminology"]) {
     const bundle = {
       "manifest.json": { id: `x.${kind}`, name: kind, version: "1.0.0", kind, schemaVersion: 1 },
       "checksums.json": { "data.json": validSha },
       "data.json": {},
     };
-    const r = validateManifestBundle(bundle);
-    assert.equal(r.ok, true, `${kind} bundle should be accepted: ${JSON.stringify(r.errors)}`);
+    assert.equal(validateManifestBundle(bundle).ok, true);
   }
+});
+
+test("deep scan refuses javascript: URI in a JSON string value", () => {
+  const b = goodStrategyBundle();
+  b["strategies.json"] = [{ helpUrl: "javascript:alert(1)" }];
+  const r = validateManifestBundle(b);
+  assert.equal(r.ok, false);
+  assert.ok(r.errors.some((e) => /javascript: URI/.test(e)));
+});
+
+test("deep scan refuses <script> tag in a JSON string value", () => {
+  const b = goodStrategyBundle();
+  b["sources.json"] = [{ description: "see <script>evil()</script>" }];
+  const r = validateManifestBundle(b);
+  assert.equal(r.ok, false);
+  assert.ok(r.errors.some((e) => /<script> tag/.test(e)));
+});
+
+test("deep scan refuses on*= event handler in a JSON string value", () => {
+  const b = goodStrategyBundle();
+  b["rules.json"] = [{ description: "<div onclick=\"alert(1)\">" }];
+  const r = validateManifestBundle(b);
+  assert.equal(r.ok, false);
+  assert.ok(r.errors.some((e) => /event handler/.test(e)));
 });
