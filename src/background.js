@@ -219,6 +219,12 @@ chrome.runtime.onMessage.addListener((msg, _sender, sendResponse) => {
             ? { error: "inventory is corrupt", details: String(err.message) }
             : { error: String(err?.message || err) });
         }
+      } else if (msg?.type === "GET_STRATEGY_PACKS") {
+        try {
+          sendResponse((await repo.list("strategyPacks")).filter((p) => p.active !== false));
+        } catch (err) {
+          sendResponse({ error: String(err?.message || err) });
+        }
       } else {
         sendResponse({ error: "unknown message" });
       }

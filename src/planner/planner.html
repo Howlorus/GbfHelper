@@ -1,0 +1,40 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <title>GBF Copilot — Planner</title>
+    <link rel="stylesheet" href="planner.css" />
+  </head>
+  <body>
+    <header class="app-header">
+      <h1>Planner</h1>
+      <p class="hint">Match a strategy pack against your scanned account.</p>
+    </header>
+
+    <main class="app-body">
+      <section class="empty" id="empty" hidden>
+        <p id="empty-msg">Loading…</p>
+      </section>
+
+      <section class="controls" id="controls" hidden>
+        <label>
+          Strategy pack
+          <select id="pack-select"></select>
+        </label>
+        <label>
+          Objective
+          <select id="objective-select">
+            <option value="first-clear">First clear</option>
+            <option value="safe-solo">Safe solo</option>
+          </select>
+        </label>
+        <button type="button" id="match-btn">Match</button>
+        <button type="button" id="compare-btn" title="Enable Compare mode: pick a second pack">Compare</button>
+      </section>
+
+      <section class="results" id="results" hidden aria-live="polite"></section>
+    </main>
+
+    <script type="module" src="planner.js"></script>
+  </body>
+</html>

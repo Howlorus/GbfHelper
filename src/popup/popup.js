@@ -34,6 +34,11 @@ document.getElementById("open-options")?.addEventListener("click", (e) => {
   chrome.runtime.openOptionsPage();
 });
 
+document.getElementById("open-planner")?.addEventListener("click", (e) => {
+  e.preventDefault();
+  chrome.tabs.create({ url: chrome.runtime.getURL("src/planner/planner.html") });
+});
+
 async function loadAllowlist() {
   const url = chrome.runtime.getURL("src/data/host-allowlist.json");
   const res = await fetch(url);
