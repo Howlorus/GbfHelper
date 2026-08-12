@@ -11,8 +11,14 @@ import "./lib/parsers/characters.js";
 import "./lib/parsers/weapons.js";
 import "./lib/parsers/summons.js";
 import "./lib/parsers/teams.js";
-import { planCommit } from "./lib/inventory-commit.js";
+import { buildInventoryContent } from "./lib/inventory-commit.js";
 import { scanLifecycleAction } from "./lib/scan-lifecycle.js";
+import { IndexedDBRepository } from "./lib/repositories/idb.js";
+import { STORE_NAMES } from "./lib/stores.js";
+import { wrapEnvelope } from "./lib/envelope.js";
+import { wrapWithValidation, CorruptionError } from "./lib/corruption.js";
+
+const repo = wrapWithValidation(new IndexedDBRepository({ stores: STORE_NAMES, version: 1 }));
 
 const BADGE_BG = "#e0a020";
 const BADGE_FG = "#101010";
@@ -146,21 +152,28 @@ async function commitInventory() {
     return { ok: false, error: "no active scan session" };
   }
   try {
-    const [{ [SCAN_BUFFER_KEY]: buffer }, prev] = await Promise.all([
-      chrome.storage.session.get(SCAN_BUFFER_KEY),
-      chrome.storage.local.get("inventory"),
-    ]);
-    const delta = planCommit(prev.inventory || null, buffer, {
-      schemaVersion: 1,
-      extensionVersion: chrome.runtime.getManifest().version,
-      committedAt: Date.now(),
+    const { [SCAN_BUFFER_KEY]: buffer } = await chrome.storage.session.get(SCAN_BUFFER_KEY);
+    const now = Date.now();
+    const extensionVersion = chrome.runtime.getManifest().version;
+    const content = buildInventoryContent(buffer);
+
+    // Atomic transaction: archive the current "current" record as "previous",
+    // then write the new commit. Any throw aborts the whole write.
+    await repo.transaction(["inventory"], async (tx) => {
+      const previous = await tx.get("inventory", "current");
+      if (previous) {
+        await tx.put("inventory", wrapEnvelope({ ...previous, id: "previous" }, {
+          now, extensionVersion, previous,
+        }));
+      }
+      const record = wrapEnvelope({ id: "current", ...content }, {
+        schemaVersion: 1, extensionVersion, now, previous,
+      });
+      await tx.put("inventory", record);
     });
-    // Single atomic set: chrome.storage.local commits all keys together. A
-    // mid-write crash cannot leave inventory written but inventoryPrev stale.
-    await chrome.storage.local.set(delta);
-    // Only tear down the scan after persistence has landed.
+
     await dispatch({ type: EVENTS.STOP_SESSION });
-    return { ok: true, completeness: delta.inventory.completeness, committedAt: delta.inventory.committedAt };
+    return { ok: true, completeness: content.completeness, committedAt: now };
   } catch (err) {
     console.warn("[GBF Copilot] commit failed:", err);
     return { ok: false, error: String(err?.message || err) };
@@ -199,8 +212,13 @@ chrome.runtime.onMessage.addListener((msg, _sender, sendResponse) => {
       } else if (msg?.type === "COMMIT_INVENTORY") {
         sendResponse(await commitInventory());
       } else if (msg?.type === "GET_INVENTORY") {
-        const { inventory } = await chrome.storage.local.get("inventory");
-        sendResponse(inventory || null);
+        try {
+          sendResponse(await repo.get("inventory", "current"));
+        } catch (err) {
+          sendResponse(err instanceof CorruptionError
+            ? { error: "inventory is corrupt", details: String(err.message) }
+            : { error: String(err?.message || err) });
+        }
       } else {
         sendResponse({ error: "unknown message" });
       }

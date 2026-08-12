@@ -1,6 +1,6 @@
-// Corruption detection layer over any Repository. Every read is validated
-// against the §42 envelope shape and (optionally) a content-hash. Failure
-// surfaces via CorruptionError — never a silent skip (§7.5).
+// Corruption detection layer over any Repository. Envelope shape is checked
+// on BOTH read and write — write-side enforcement closes the "write an
+// envelope-less record then blow up on the next read" gap.
 
 import { assertEnvelope } from "./envelope.js";
 
@@ -13,52 +13,24 @@ export class CorruptionError extends Error {
   }
 }
 
-export function validateEnvelope(record) {
-  try {
-    assertEnvelope(record);
-    return { ok: true };
-  } catch (err) {
-    return { ok: false, error: err.message };
-  }
-}
-
-// Compute a stable SHA-256 hex digest of the record's non-envelope content.
-// Excluding updatedAt / createdAt / contentHash means routine timestamp
-// changes do not invalidate the hash of the payload itself.
-export async function computeContentHash(record) {
-  const { contentHash, updatedAt, createdAt, ...rest } = record;
-  const canonical = JSON.stringify(rest);
-  const buf = await globalThis.crypto.subtle.digest(
-    "SHA-256",
-    new TextEncoder().encode(canonical)
-  );
-  return [...new Uint8Array(buf)].map((b) => b.toString(16).padStart(2, "0")).join("");
-}
-
-export function wrapWithValidation(repo, {
-  validate = validateEnvelope,
-  hasher = null,
-} = {}) {
-  async function check(store, rec) {
+export function wrapWithValidation(repo) {
+  function checkOrThrow(store, rec) {
     if (rec == null) return rec;
-    const v = validate(rec);
-    if (!v.ok) throw new CorruptionError(`corrupt record ${store}/${rec?.id ?? "?"}: ${v.error}`, { store, id: rec?.id });
-    if (hasher && rec.contentHash) {
-      const actual = await hasher(rec);
-      if (actual !== rec.contentHash) {
-        throw new CorruptionError(`content hash mismatch ${store}/${rec.id}`, { store, id: rec.id });
-      }
+    try {
+      assertEnvelope(rec);
+    } catch (err) {
+      throw new CorruptionError(`corrupt record ${store}/${rec?.id ?? "?"}: ${err.message}`, { store, id: rec?.id });
     }
     return rec;
   }
 
   return {
-    get: async (s, id) => check(s, await repo.get(s, id)),
-    put: (s, r) => repo.put(s, r),
+    get: async (s, id) => checkOrThrow(s, await repo.get(s, id)),
+    put: async (s, r) => { checkOrThrow(s, r); return repo.put(s, r); },
     delete: (s, id) => repo.delete(s, id),
     list: async (s) => {
       const all = await repo.list(s);
-      for (const rec of all) await check(s, rec);
+      for (const rec of all) checkOrThrow(s, rec);
       return all;
     },
     clear: (s) => repo.clear(s),

@@ -1,23 +1,5 @@
-// Record envelope per PRD §42. Every persisted record carries these fields
-// so migrations, provenance, and downstream Epics can trust their inputs.
-//
-// The envelope is expressed as reserved keys on the record itself (no
-// nested "envelope" object) so IndexedDB range queries stay simple.
-
-export const ENVELOPE_KEYS = Object.freeze([
-  "id",
-  "schemaVersion",
-  "extensionVersion",
-  "gameDataVersion",
-  "strategyPackVersion",
-  "raidPlanVersion",
-  "calibrationVersion",
-  "createdAt",
-  "updatedAt",
-  "provenance",
-  "status",
-  "contentHash",
-]);
+// Record envelope per PRD §42. Kept flat (no nested "envelope" object).
+// Domain code adds pack/plan/calibration version stamps as producers land.
 
 export const REQUIRED_ENVELOPE_KEYS = Object.freeze(["id", "schemaVersion", "extensionVersion", "createdAt", "updatedAt"]);
 
@@ -30,15 +12,8 @@ export function wrapEnvelope(record, meta = {}) {
     ...record,
     schemaVersion: meta.schemaVersion ?? record.schemaVersion ?? 1,
     extensionVersion: meta.extensionVersion ?? record.extensionVersion ?? "0.0.0",
-    gameDataVersion: meta.gameDataVersion ?? record.gameDataVersion ?? null,
-    strategyPackVersion: meta.strategyPackVersion ?? record.strategyPackVersion ?? null,
-    raidPlanVersion: meta.raidPlanVersion ?? record.raidPlanVersion ?? null,
-    calibrationVersion: meta.calibrationVersion ?? record.calibrationVersion ?? null,
     createdAt: previous?.createdAt ?? record.createdAt ?? now,
     updatedAt: now,
-    provenance: meta.provenance ?? record.provenance ?? "unknown",
-    status: meta.status ?? record.status ?? "active",
-    contentHash: meta.contentHash ?? record.contentHash ?? null,
   };
 }
 
@@ -50,9 +25,4 @@ export function assertEnvelope(record) {
     }
   }
   return true;
-}
-
-export function needsMigration(record, targetSchemaVersion) {
-  if (!record) return false;
-  return record.schemaVersion !== targetSchemaVersion;
 }
