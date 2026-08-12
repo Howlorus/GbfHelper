@@ -25,6 +25,26 @@
       </section>
 
       <section class="results" id="results" hidden aria-live="polite"></section>
+
+      <section class="optim" id="optim">
+        <header class="optim-head">
+          <h2>Optimization</h2>
+          <p class="hint">Choose an objective — weights are visible and drive proposal ranking + A/B comparisons.</p>
+        </header>
+        <label class="objective-row">
+          <span>Objective</span>
+          <select id="objective-select"></select>
+        </label>
+        <div class="weights" id="weights-table" aria-label="Objective weights"></div>
+
+        <section class="proposals" id="proposals">
+          <h3>Proposals</h3>
+          <p class="empty-proposals" id="empty-proposals">
+            No proposals available. Proposals arrive once the diagnosis pipeline can classify Setup / Rotation / Prediction failures — currently waiting on §49 event parsers.
+          </p>
+          <ul class="proposal-list" id="proposal-list" hidden></ul>
+        </section>
+      </section>
     </main>
 
     <script type="module" src="planner.js"></script>

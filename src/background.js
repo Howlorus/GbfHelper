@@ -31,6 +31,8 @@ import { getProtocol, listProtocols } from "./lib/calibration/protocol.js";
 import { fingerprintId, invalidateOnPackBump } from "./lib/calibration/fingerprint.js";
 import { buildSample } from "./lib/calibration/sampling.js";
 import { aggregate } from "./lib/calibration/aggregate.js";
+import { getCurrentPlan, saveNewVersion } from "./lib/raid-plan/repository.js";
+import { applyProposal, buildAuditEntry, compareProposalAgainstPlan, DECISION } from "./lib/optimization/proposals.js";
 
 const repo = wrapWithValidation(new IndexedDBRepository({ stores: STORE_NAMES, version: 1 }));
 
@@ -507,6 +509,44 @@ chrome.runtime.onMessage.addListener((msg, _sender, sendResponse) => {
         if (msg.confirmation !== "DELETE") {
           sendResponse({ ok: false, error: "typed confirmation required" });
         } else sendResponse(await applyCleanup(repo, planWipeAll(STORE_NAMES)));
+      } else if (msg?.type === "LIST_PROPOSALS") {
+        // No proposal source ships yet — waits on §49 event parsers before
+        // diagnoses can classify Setup/Rotation/Prediction failures. Return
+        // empty so the UI honestly shows "no proposals".
+        sendResponse([]);
+      } else if (msg?.type === "ACCEPT_PROPOSAL") {
+        try {
+          const proposal = msg.proposal;
+          if (!proposal?.source?.planId) { sendResponse({ ok: false, error: "proposal.source.planId required" }); return; }
+          const source = await getCurrentPlan(repo, proposal.source.planId);
+          if (!source) { sendResponse({ ok: false, error: `plan not found: ${proposal.source.planId}` }); return; }
+          const input = applyProposal(source, proposal, { newPlanId: msg.newPlanId });
+          const record = await saveNewVersion(repo, input, {
+            extensionVersion: chrome.runtime.getManifest().version,
+          });
+          const audit = buildAuditEntry({ proposal, decision: DECISION.ACCEPTED, plan: source, userNote: msg.userNote || null });
+          sendResponse({ ok: true, plan: { id: record.id, planId: record.planId, raidPlanVersion: record.raidPlanVersion }, audit });
+        } catch (err) {
+          sendResponse({ ok: false, error: String(err?.message || err) });
+        }
+      } else if (msg?.type === "REJECT_PROPOSAL") {
+        try {
+          const proposal = msg.proposal;
+          const source = proposal?.source?.planId ? await getCurrentPlan(repo, proposal.source.planId) : null;
+          const audit = buildAuditEntry({ proposal, decision: DECISION.REJECTED, plan: source, userNote: msg.userNote || null });
+          sendResponse({ ok: true, audit });
+        } catch (err) {
+          sendResponse({ ok: false, error: String(err?.message || err) });
+        }
+      } else if (msg?.type === "COMPARE_PROPOSAL") {
+        try {
+          const proposal = msg.proposal;
+          const source = proposal?.source?.planId ? await getCurrentPlan(repo, proposal.source.planId) : null;
+          if (!source) { sendResponse({ error: "source plan not found" }); return; }
+          sendResponse(compareProposalAgainstPlan(source, proposal));
+        } catch (err) {
+          sendResponse({ error: String(err?.message || err) });
+        }
       } else if (msg?.type === "GET_CALIBRATION_PROTOCOLS") {
         sendResponse(listProtocols());
       } else if (msg?.type === "GET_CALIBRATION_SESSION") {
