@@ -59,6 +59,11 @@ document.getElementById("open-diagnostics")?.addEventListener("click", (e) => {
   chrome.tabs.create({ url: chrome.runtime.getURL("src/diagnostics/diagnostics.html") });
 });
 
+document.getElementById("open-calibration")?.addEventListener("click", (e) => {
+  e.preventDefault();
+  chrome.tabs.create({ url: chrome.runtime.getURL("src/calibration/calibration.html") });
+});
+
 async function loadAllowlist() {
   const url = chrome.runtime.getURL("src/data/host-allowlist.json");
   const res = await fetch(url);
@@ -216,6 +221,10 @@ document.getElementById("actions").addEventListener("click", async (e) => {
   const tab = await getActiveTab();
   const next = await dispatch({ type: btn.dataset.event, tabId: tab?.id, tabTitle: tab?.title });
   if (next?.error) document.getElementById("action-notice").textContent = next.error;
+  // Auto-open the guided-execution tab for Calibration — the popup can't host it (§10.2).
+  if (btn.dataset.event === "START_CALIBRATION_SESSION" && next?.state === STATES.CALIBRATION_SESSION_ACTIVE) {
+    chrome.tabs.create({ url: chrome.runtime.getURL("src/calibration/calibration.html") });
+  }
   await refresh();
 });
 

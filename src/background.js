@@ -27,6 +27,10 @@ import { buildInitialBattleState, applyEvent } from "./lib/battle/state-model.js
 import { buildEvent, appendEvent } from "./lib/battle/event-log.js";
 import { finalizeRun } from "./lib/battle/session.js";
 import { classifyRun } from "./lib/diagnosis/classifier.js";
+import { getProtocol, listProtocols } from "./lib/calibration/protocol.js";
+import { fingerprintId, invalidateOnPackBump } from "./lib/calibration/fingerprint.js";
+import { buildSample } from "./lib/calibration/sampling.js";
+import { aggregate } from "./lib/calibration/aggregate.js";
 
 const repo = wrapWithValidation(new IndexedDBRepository({ stores: STORE_NAMES, version: 1 }));
 
@@ -39,9 +43,78 @@ const SCAN_BUFFER_KEY = "scanBuffer";
 const BATTLE_STATE_KEY = "battleState";
 const BATTLE_EVENTS_KEY = "battleEvents";
 const BATTLE_SESSION_META_KEY = "battleSessionMeta";
+const CALIBRATION_SESSION_KEY = "calibrationSession";
 
 function initialScanBuffer() {
   return { characters: [], weapons: [], summons: [], teams: [], parserStatus: {}, warnings: [] };
+}
+
+function initialCalibrationSession(state) {
+  return {
+    sessionId: `cal-${Date.now()}`,
+    protocolId: null,
+    fingerprintFields: null,
+    fingerprintId: null,
+    currentStepIndex: 0,
+    stepHistory: [],
+    samples: [],
+    startedAt: state?.since || Date.now(),
+    tabTitle: state?.tabTitle || null,
+  };
+}
+
+async function getCalibrationSession() {
+  const { [CALIBRATION_SESSION_KEY]: s } = await chrome.storage.session.get(CALIBRATION_SESSION_KEY);
+  return s || null;
+}
+
+async function updateCalibrationSession(fn) {
+  const cur = (await getCalibrationSession()) || initialCalibrationSession();
+  const next = fn(cur);
+  await chrome.storage.session.set({ [CALIBRATION_SESSION_KEY]: next });
+  return next;
+}
+
+async function finalizeCalibration() {
+  const state = await getState();
+  if (state.state !== STATES.CALIBRATION_SESSION_ACTIVE) {
+    return { ok: false, error: "no active calibration session" };
+  }
+  const session = await getCalibrationSession();
+  if (!session?.protocolId) return { ok: false, error: "no protocol selected" };
+  const protocol = getProtocol(session.protocolId);
+  if (!protocol) return { ok: false, error: `unknown protocol ${session.protocolId}` };
+  try {
+    const agg = aggregate(session.samples, { protocol });
+    const now = Date.now();
+    const extensionVersion = chrome.runtime.getManifest().version;
+    const gameDataVersion = session.fingerprintFields?.gameDataVersion || null;
+    const record = wrapEnvelope({
+      id: `cal:${session.sessionId}`,
+      sessionId: session.sessionId,
+      protocolId: session.protocolId,
+      status: "completed",
+      fingerprintFields: session.fingerprintFields,
+      fingerprintId: session.fingerprintId,
+      startedAt: session.startedAt,
+      endedAt: now,
+      samples: session.samples,
+      aggregate: agg,
+      gameDataVersion,
+      calibrationVersion: 1,
+    }, { schemaVersion: 1, extensionVersion, now });
+    await repo.put("calibration", record);
+    await dispatch({ type: EVENTS.STOP_SESSION });
+    return { ok: true, record };
+  } catch (err) {
+    console.warn("[GBF Copilot] finalize calibration failed:", err);
+    return { ok: false, error: String(err?.message || err) };
+  }
+}
+
+async function listCalibrations() {
+  try { return await repo.list("calibration"); }
+  catch (err) { return { error: String(err?.message || err) }; }
 }
 
 // One registry per service-worker lifetime. When the SW dies, in-memory
@@ -102,6 +175,18 @@ async function dispatch(action) {
       });
     } else if (current.state === STATES.RAID_SESSION_ACTIVE && next.state !== STATES.RAID_SESSION_ACTIVE) {
       await finalizeRaidSession(action.type);
+    }
+    // Calibration-session lifecycle: seed an empty session on entry, clear
+    // any in-progress buffer on exit. Finalization (write to `calibration`
+    // store) happens in the FINALIZE_CALIBRATION handler, before it dispatches
+    // STOP_SESSION — so by the time we clear here, either the record has
+    // been persisted or the user discarded on purpose.
+    if (current.state !== STATES.CALIBRATION_SESSION_ACTIVE && next.state === STATES.CALIBRATION_SESSION_ACTIVE) {
+      await chrome.storage.session.set({
+        [CALIBRATION_SESSION_KEY]: initialCalibrationSession(next),
+      });
+    } else if (current.state === STATES.CALIBRATION_SESSION_ACTIVE && next.state !== STATES.CALIBRATION_SESSION_ACTIVE) {
+      await chrome.storage.session.remove(CALIBRATION_SESSION_KEY);
     }
     await updateBadge(next);
   }
@@ -298,7 +383,19 @@ async function applyUpdate(rawFiles) {
     // installPack writes transactionally — a mid-write failure rolls back
     // the whole install via the repo's transaction abort semantics (§43).
     const record = await installPack(repo, prepared.bundle, { wrapEnvelope, now, extensionVersion });
-    return { ok: true, installed: { id: record.id, name: record.name, version: record.version, kind: record.kind } };
+    // US-08-06 AC1: on gameData pack bump, mark stale calibrations as invalidated.
+    let invalidated = 0;
+    if (record.kind === "gameData") {
+      const current = await repo.list("calibration");
+      const updated = invalidateOnPackBump(current, { newGameDataVersion: record.version });
+      for (let i = 0; i < updated.length; i++) {
+        if (updated[i]?.status === "invalidated-pack" && current[i]?.status !== "invalidated-pack") {
+          await repo.put("calibration", wrapEnvelope(updated[i], { schemaVersion: 1, extensionVersion, now }));
+          invalidated++;
+        }
+      }
+    }
+    return { ok: true, installed: { id: record.id, name: record.name, version: record.version, kind: record.kind }, invalidatedCalibrations: invalidated };
   } catch (err) {
     console.warn("[GBF Copilot] pack install failed:", err);
     return { ok: false, error: String(err?.message || err) };
@@ -410,6 +507,66 @@ chrome.runtime.onMessage.addListener((msg, _sender, sendResponse) => {
         if (msg.confirmation !== "DELETE") {
           sendResponse({ ok: false, error: "typed confirmation required" });
         } else sendResponse(await applyCleanup(repo, planWipeAll(STORE_NAMES)));
+      } else if (msg?.type === "GET_CALIBRATION_PROTOCOLS") {
+        sendResponse(listProtocols());
+      } else if (msg?.type === "GET_CALIBRATION_SESSION") {
+        sendResponse(await getCalibrationSession());
+      } else if (msg?.type === "SET_CALIBRATION_PROTOCOL") {
+        if (!getProtocol(msg.protocolId)) {
+          sendResponse({ error: `unknown protocol ${msg.protocolId}` });
+        } else {
+          const fp = msg.fingerprintFields || {};
+          const next = await updateCalibrationSession((s) => ({
+            ...s,
+            protocolId: msg.protocolId,
+            fingerprintFields: fp,
+            fingerprintId: fingerprintId(fp),
+            currentStepIndex: 0,
+            stepHistory: [],
+            samples: [],
+          }));
+          sendResponse({ ok: true, session: next });
+        }
+      } else if (msg?.type === "ADVANCE_CALIBRATION_STEP") {
+        const next = await updateCalibrationSession((s) => {
+          const protocol = getProtocol(s.protocolId);
+          if (!protocol) return s;
+          const maxIdx = protocol.steps.length - 1;
+          if (s.currentStepIndex >= maxIdx) return s;
+          const stepId = protocol.steps[s.currentStepIndex];
+          return {
+            ...s,
+            currentStepIndex: s.currentStepIndex + 1,
+            stepHistory: [...s.stepHistory, { stepId, doneAt: Date.now() }],
+          };
+        });
+        sendResponse({ ok: true, session: next });
+      } else if (msg?.type === "ADD_CALIBRATION_SAMPLE") {
+        try {
+          const next = await updateCalibrationSession((s) => {
+            const protocol = getProtocol(s.protocolId);
+            const stepId = protocol?.steps?.[s.currentStepIndex] || `step-${s.currentStepIndex}`;
+            const sample = buildSample({
+              protocolStepId: stepId,
+              value: msg.value,
+              stateQuality: msg.stateQuality,
+              notes: msg.notes || null,
+            });
+            return { ...s, samples: [...s.samples, sample] };
+          });
+          sendResponse({ ok: true, session: next });
+        } catch (err) {
+          sendResponse({ ok: false, error: String(err?.message || err) });
+        }
+      } else if (msg?.type === "REMOVE_CALIBRATION_SAMPLE") {
+        const next = await updateCalibrationSession((s) => ({
+          ...s, samples: s.samples.filter((x) => x.ts !== msg.ts),
+        }));
+        sendResponse({ ok: true, session: next });
+      } else if (msg?.type === "FINALIZE_CALIBRATION") {
+        sendResponse(await finalizeCalibration());
+      } else if (msg?.type === "LIST_CALIBRATIONS") {
+        sendResponse(await listCalibrations());
       } else if (msg?.type === "BUILD_BACKUP") {
         sendResponse(await buildBackup(repo, { extensionVersion: chrome.runtime.getManifest().version }));
       } else if (msg?.type === "RESTORE_BACKUP") {

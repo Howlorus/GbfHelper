@@ -1,0 +1,129 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <title>GBF Copilot — Calibration Lab</title>
+    <link rel="stylesheet" href="calibration.css" />
+  </head>
+  <body>
+    <header class="app-header">
+      <h1>Calibration Lab</h1>
+      <p class="hint">Measure your setup. The Lab observes; you execute the actions in-game.</p>
+    </header>
+
+    <main class="app-body">
+      <section class="empty" id="empty" hidden>
+        <p id="empty-msg">Loading…</p>
+      </section>
+
+      <!-- STEP 1: pick protocol + fingerprint -->
+      <section class="pick-panel" id="pick-panel" hidden>
+        <div class="pick-row">
+          <label class="field">
+            <span class="field-label">Test protocol</span>
+            <select id="protocol-select" aria-describedby="protocol-purpose"></select>
+          </label>
+          <p class="protocol-meta" id="protocol-meta"></p>
+        </div>
+
+        <fieldset class="fingerprint-fields">
+          <legend>Setup fingerprint <span class="legend-hint">— required so samples never mix across setups</span></legend>
+          <p class="fp-hint">Any field left blank counts as an empty string. Whatever you type here is what pins this batch of samples.</p>
+          <div class="fp-grid" id="fp-grid"></div>
+        </fieldset>
+
+        <button type="button" id="start-btn" class="primary">Start protocol</button>
+      </section>
+
+      <!-- STEP 2: guided execution -->
+      <section class="run-panel" id="run-panel" hidden aria-live="polite">
+        <div class="run-header">
+          <div>
+            <h2 id="run-protocol-name">—</h2>
+            <p class="run-fp" id="run-fp"></p>
+          </div>
+          <div class="run-progress">
+            <span id="step-index">1</span> / <span id="step-count">1</span>
+            <button type="button" id="quit-btn" class="secondary">Discard session</button>
+          </div>
+        </div>
+
+        <div class="warn" id="quality-warn" hidden role="alert">
+          State quality dropped below Synchronized — re-sync (reload the raid tab or restart the fight) before recording more samples.
+        </div>
+
+        <article class="step-card">
+          <h3>Current step</h3>
+          <p class="step-text" id="step-text">—</p>
+          <div class="step-actions">
+            <button type="button" id="advance-btn" class="primary" accesskey="n">Mark step done →</button>
+          </div>
+        </article>
+
+        <section class="sample-entry">
+          <h3>Record a sample</h3>
+          <p class="hint">Enter the value you observed in-game for the current step's metric (<span id="metric-name">—</span>).</p>
+          <div class="sample-row">
+            <label class="field">
+              <span class="field-label">Value</span>
+              <input type="number" id="sample-value" step="any" inputmode="decimal" />
+            </label>
+            <label class="field">
+              <span class="field-label">State quality</span>
+              <select id="sample-quality">
+                <option value="Synchronized">Synchronized</option>
+                <option value="PartiallySynchronized" selected>PartiallySynchronized</option>
+                <option value="Stale">Stale</option>
+                <option value="Conflicting">Conflicting</option>
+              </select>
+            </label>
+            <label class="field grow">
+              <span class="field-label">Notes (optional)</span>
+              <input type="text" id="sample-notes" maxlength="140" />
+            </label>
+            <button type="button" id="add-sample-btn" class="primary">Add sample</button>
+          </div>
+        </section>
+
+        <section class="samples-list">
+          <h3>Samples <span id="samples-summary" class="muted">0</span></h3>
+          <table class="samples-table">
+            <thead>
+              <tr><th>#</th><th>Value</th><th>Quality</th><th>Outlier</th><th>Notes</th><th></th></tr>
+            </thead>
+            <tbody id="samples-body">
+              <tr class="empty-row"><td colspan="6">No samples yet.</td></tr>
+            </tbody>
+          </table>
+        </section>
+
+        <div class="finalize-row">
+          <p class="live-conf" id="live-conf">Confidence: <span id="live-conf-label">InsufficientData</span></p>
+          <button type="button" id="finalize-btn" class="primary" disabled>Finalize calibration</button>
+        </div>
+      </section>
+
+      <!-- STEP 3: results -->
+      <section class="result-panel" id="result-panel" hidden>
+        <div class="result-header">
+          <h2 id="result-name">Calibration complete</h2>
+          <span class="badge" id="result-confidence">—</span>
+        </div>
+        <dl class="result-facts" id="result-facts"></dl>
+        <p class="result-note" id="result-note"></p>
+        <div class="result-actions">
+          <button type="button" id="new-run-btn" class="primary">Run another protocol</button>
+        </div>
+      </section>
+
+      <!-- Historical calibrations -->
+      <section class="history-panel">
+        <h2>Past calibrations</h2>
+        <p id="history-empty" class="muted">No calibrations saved yet.</p>
+        <ul class="history-list" id="history-list" hidden></ul>
+      </section>
+    </main>
+
+    <script type="module" src="calibration.js"></script>
+  </body>
+</html>
