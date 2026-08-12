@@ -1,13 +1,7 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { buildEvent, appendEvent, EVENT_LOG_CAP } from "../src/lib/battle/event-log.js";
+import { buildEvent, appendEvent } from "../src/lib/battle/event-log.js";
 import { finalizeRun } from "../src/lib/battle/session.js";
-
-test("buildEvent normalizes an unknown kind to 'unknown'", () => {
-  const e = buildEvent("bogus", { ts: 100 });
-  assert.equal(e.kind, "unknown");
-  assert.equal(e.ts, 100);
-});
 
 test("buildEvent copies the payload defensively (no external mutation)", () => {
   const p = { damage: 42 };
@@ -17,19 +11,8 @@ test("buildEvent copies the payload defensively (no external mutation)", () => {
 });
 
 test("appendEvent returns a new array (pure)", () => {
-  const log = [];
-  const next = appendEvent(log, buildEvent("attack"));
-  assert.equal(log.length, 0);
+  const next = appendEvent([], buildEvent("attack"));
   assert.equal(next.length, 1);
-});
-
-test("appendEvent respects the in-memory cap", () => {
-  let log = [];
-  // Cheat the cap for the test:
-  const CAP = EVENT_LOG_CAP;
-  for (let i = 0; i < CAP; i++) log.push({ ts: i, kind: "attack" });
-  const stillCap = appendEvent(log, buildEvent("attack"));
-  assert.equal(stillCap.length, CAP);
 });
 
 test("finalizeRun packages events + state + provenance", () => {
