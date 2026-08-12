@@ -1,0 +1,22 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <title>GBF Copilot — Run Review</title>
+    <link rel="stylesheet" href="review.css" />
+  </head>
+  <body>
+    <header class="app-header">
+      <h1>Run Review</h1>
+      <p class="hint">Timeline of past raid sessions with their §27 diagnosis.</p>
+    </header>
+
+    <main class="app-body">
+      <section class="empty" id="empty" hidden><p id="empty-msg">Loading…</p></section>
+      <ul id="run-list" class="run-list"></ul>
+      <section id="detail" class="detail" hidden aria-live="polite"></section>
+    </main>
+
+    <script type="module" src="review.js"></script>
+  </body>
+</html>

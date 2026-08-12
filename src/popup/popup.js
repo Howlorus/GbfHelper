@@ -49,6 +49,11 @@ document.getElementById("open-storage")?.addEventListener("click", (e) => {
   chrome.tabs.create({ url: chrome.runtime.getURL("src/storage/storage.html") });
 });
 
+document.getElementById("open-review")?.addEventListener("click", (e) => {
+  e.preventDefault();
+  chrome.tabs.create({ url: chrome.runtime.getURL("src/review/review.html") });
+});
+
 async function loadAllowlist() {
   const url = chrome.runtime.getURL("src/data/host-allowlist.json");
   const res = await fetch(url);

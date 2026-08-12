@@ -26,6 +26,7 @@ import { buildBackup, restoreBackup } from "./lib/storage/backup.js";
 import { buildInitialBattleState, applyEvent } from "./lib/battle/state-model.js";
 import { buildEvent, appendEvent } from "./lib/battle/event-log.js";
 import { finalizeRun } from "./lib/battle/session.js";
+import { classifyRun } from "./lib/diagnosis/classifier.js";
 
 const repo = wrapWithValidation(new IndexedDBRepository({ stores: STORE_NAMES, version: 1 }));
 
@@ -356,6 +357,11 @@ chrome.runtime.onMessage.addListener((msg, _sender, sendResponse) => {
       } else if (msg?.type === "LIST_RUNS") {
         try { sendResponse(await repo.list("runHistory")); }
         catch (err) { sendResponse({ error: String(err?.message || err) }); }
+      } else if (msg?.type === "DIAGNOSE_RUN") {
+        try {
+          const run = await repo.get("runHistory", msg.runId);
+          sendResponse(run ? { run, diagnosis: classifyRun(run) } : { error: "run not found" });
+        } catch (err) { sendResponse({ error: String(err?.message || err) }); }
       } else if (msg?.type === "DELETE_RUN") {
         try { await repo.delete("runHistory", msg.runId); sendResponse({ ok: true }); }
         catch (err) { sendResponse({ ok: false, error: String(err?.message || err) }); }

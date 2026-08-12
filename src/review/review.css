@@ -1,0 +1,42 @@
+:root {
+  --bg: #14161a; --fg: #e6e8ec; --muted: #8a90a0; --accent: #6fb1ff;
+  --ready: #6bd6a0; --warn: #e0b060; --danger: #e07070;
+  --divider: #22262d; --surface: #1b1f26;
+}
+@media (prefers-color-scheme: light) {
+  :root { --bg: #ffffff; --fg: #14161a; --muted: #5c6370; --accent: #0057c2;
+    --ready: #128a4d; --warn: #a3620d; --danger: #b31414;
+    --divider: #e5e7eb; --surface: #f4f5f7; }
+}
+@media (prefers-reduced-motion: reduce) { * { animation: none !important; transition: none !important; } }
+
+html, body { margin: 0; padding: 0; background: var(--bg); color: var(--fg);
+  font: 14px/1.5 -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; }
+
+.app-header { padding: 20px 24px; border-bottom: 1px solid var(--divider); }
+.app-header h1 { margin: 0 0 4px; font-size: 18px; }
+.app-header .hint { margin: 0; color: var(--muted); font-size: 13px; }
+
+.app-body { padding: 20px 24px; max-width: 1000px; display: grid; grid-template-columns: 320px 1fr; gap: 20px; }
+.run-list { list-style: none; padding: 0; margin: 0; }
+.run-item { padding: 10px 12px; background: var(--surface); border: 1px solid var(--divider);
+  border-radius: 6px; margin-bottom: 6px; cursor: pointer; }
+.run-item.selected { border-color: var(--accent); }
+.run-item .raid { font-weight: 600; }
+.run-item .meta { color: var(--muted); font-size: 11px; margin-top: 2px; }
+.run-item .cat { font-size: 11px; padding: 2px 6px; border: 1px solid; border-radius: 3px; }
+.run-item .cat.setup, .run-item .cat.rotation, .run-item .cat.execution { color: var(--warn); border-color: var(--warn); }
+.run-item .cat.observation { color: var(--danger); border-color: var(--danger); }
+.run-item .cat.variance { color: var(--muted); border-color: var(--muted); }
+.run-item .cat.prediction { color: var(--accent); border-color: var(--accent); }
+
+.detail { padding: 16px; background: var(--surface); border: 1px solid var(--divider); border-radius: 6px; }
+.detail h2 { margin: 0 0 8px; font-size: 15px; }
+.detail dl { display: grid; grid-template-columns: 120px 1fr; gap: 4px 12px; margin: 0 0 12px; font-size: 12px; }
+.detail dl dt { color: var(--muted); font-weight: 500; }
+.detail .diag { padding: 10px; border: 1px solid var(--divider); border-radius: 4px; background: var(--bg); }
+.detail .diag h3 { margin: 0 0 6px; font-size: 12px; text-transform: uppercase; letter-spacing: 0.5px; color: var(--muted); }
+.detail .diag ul { margin: 4px 0 0; padding-left: 18px; font-size: 12px; color: var(--muted); }
+.detail .diag .action { margin-top: 8px; padding: 6px 8px; background: var(--surface); border-left: 3px solid var(--accent); font-size: 12px; }
+
+.empty { color: var(--muted); font-style: italic; grid-column: 1 / -1; }
