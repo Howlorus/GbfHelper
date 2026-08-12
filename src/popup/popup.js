@@ -54,6 +54,11 @@ document.getElementById("open-review")?.addEventListener("click", (e) => {
   chrome.tabs.create({ url: chrome.runtime.getURL("src/review/review.html") });
 });
 
+document.getElementById("open-diagnostics")?.addEventListener("click", (e) => {
+  e.preventDefault();
+  chrome.tabs.create({ url: chrome.runtime.getURL("src/diagnostics/diagnostics.html") });
+});
+
 async function loadAllowlist() {
   const url = chrome.runtime.getURL("src/data/host-allowlist.json");
   const res = await fetch(url);

@@ -168,11 +168,31 @@ chrome.runtime.onConnect.addListener((port) => {
   });
   port.onMessage.addListener((msg) => {
     if (msg?.type === "PAYLOAD" && msg.payload) {
-      onCapturePayload(msg.payload).catch((err) =>
-        console.warn("[GBF Copilot] scan sink failed:", err));
+      if (msg.feasibility) {
+        appendDevCapture(msg.payload).catch((err) =>
+          console.warn("[GBF Copilot] feasibility log failed:", err));
+      } else {
+        onCapturePayload(msg.payload).catch((err) =>
+          console.warn("[GBF Copilot] scan sink failed:", err));
+      }
     }
   });
 });
+
+const DEV_CAPTURE_KEY = "devCaptureLog";
+const DEV_CAPTURE_CAP = 50;
+
+async function appendDevCapture(payload) {
+  const { [DEV_CAPTURE_KEY]: log } = await chrome.storage.session.get(DEV_CAPTURE_KEY);
+  const next = Array.isArray(log) ? log.slice(-DEV_CAPTURE_CAP + 1) : [];
+  next.push({
+    url: payload.url,
+    method: payload.method,
+    body: payload.body,
+    receivedAt: payload.receivedAt,
+  });
+  await chrome.storage.session.set({ [DEV_CAPTURE_KEY]: next });
+}
 
 async function commitInventory() {
   const state = await getState();
@@ -354,6 +374,18 @@ chrome.runtime.onMessage.addListener((msg, _sender, sendResponse) => {
         } catch (err) {
           sendResponse({ error: String(err?.message || err) });
         }
+      } else if (msg?.type === "GET_FEASIBILITY_MODE") {
+        const { feasibilityMode } = await chrome.storage.local.get("feasibilityMode");
+        sendResponse({ feasibilityMode: !!feasibilityMode });
+      } else if (msg?.type === "SET_FEASIBILITY_MODE") {
+        await chrome.storage.local.set({ feasibilityMode: !!msg.enabled });
+        sendResponse({ ok: true, feasibilityMode: !!msg.enabled });
+      } else if (msg?.type === "GET_DEV_CAPTURE") {
+        const { [DEV_CAPTURE_KEY]: log } = await chrome.storage.session.get(DEV_CAPTURE_KEY);
+        sendResponse(log || []);
+      } else if (msg?.type === "CLEAR_DEV_CAPTURE") {
+        await chrome.storage.session.remove(DEV_CAPTURE_KEY);
+        sendResponse({ ok: true });
       } else if (msg?.type === "LIST_RUNS") {
         try { sendResponse(await repo.list("runHistory")); }
         catch (err) { sendResponse({ error: String(err?.message || err) }); }

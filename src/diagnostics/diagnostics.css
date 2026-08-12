@@ -1,0 +1,45 @@
+:root {
+  --bg: #14161a; --fg: #e6e8ec; --muted: #8a90a0; --accent: #6fb1ff;
+  --ready: #6bd6a0; --warn: #e0b060; --danger: #e07070;
+  --divider: #22262d; --surface: #1b1f26; --surface-hover: #22272f;
+}
+@media (prefers-color-scheme: light) {
+  :root { --bg: #ffffff; --fg: #14161a; --muted: #5c6370; --accent: #0057c2;
+    --ready: #128a4d; --warn: #a3620d; --danger: #b31414;
+    --divider: #e5e7eb; --surface: #f4f5f7; --surface-hover: #e9ebef; }
+}
+
+html, body { margin: 0; padding: 0; background: var(--bg); color: var(--fg);
+  font: 14px/1.5 -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; }
+
+.app-header { padding: 20px 24px; border-bottom: 1px solid var(--divider); }
+.app-header h1 { margin: 0 0 4px; font-size: 18px; }
+.app-header .hint { margin: 0; color: var(--muted); font-size: 13px; max-width: 760px; }
+.app-body { padding: 20px 24px; max-width: 1100px; }
+section { margin-bottom: 24px; }
+section h2 { margin: 0 0 6px; font-size: 14px; font-weight: 600; }
+.hint { color: var(--muted); font-size: 12px; margin: 4px 0 12px; }
+
+.toggle { display: inline-flex; align-items: center; gap: 8px; font-size: 13px; }
+.warn { color: var(--warn); font-size: 12px; margin: 4px 0 0; }
+
+.row { display: flex; gap: 8px; }
+button { padding: 6px 12px; background: var(--surface); color: var(--fg);
+  border: 1px solid var(--divider); border-radius: 4px; font: inherit; cursor: pointer; }
+button:hover, button:focus-visible { background: var(--surface-hover); border-color: var(--accent); outline: none; }
+button.danger { color: var(--danger); border-color: var(--danger); }
+button.copy { padding: 2px 8px; font-size: 11px; }
+
+.notice { margin-top: 6px; min-height: 16px; font-size: 12px; color: var(--muted); }
+.notice.ok { color: var(--ready); }
+
+.capture-list { list-style: none; padding: 0; margin: 12px 0 0; }
+.capture-item {
+  padding: 10px 12px; background: var(--surface); border: 1px solid var(--divider);
+  border-radius: 6px; margin-bottom: 8px;
+}
+.capture-item .head { display: flex; justify-content: space-between; gap: 8px; align-items: baseline; }
+.capture-item .url { font-family: ui-monospace, "SF Mono", Consolas, monospace; font-size: 12px; word-break: break-all; }
+.capture-item .method { font-size: 11px; color: var(--muted); padding: 1px 6px; border: 1px solid var(--divider); border-radius: 3px; }
+.capture-item pre { margin: 6px 0 0; padding: 8px 10px; background: var(--bg); border: 1px solid var(--divider); border-radius: 4px;
+  font-family: ui-monospace, "SF Mono", Consolas, monospace; font-size: 11px; color: var(--muted); overflow-x: auto; max-height: 240px; white-space: pre-wrap; }

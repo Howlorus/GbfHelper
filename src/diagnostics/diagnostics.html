@@ -1,0 +1,43 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <title>GBF Copilot — Feasibility Capture (§49)</title>
+    <link rel="stylesheet" href="diagnostics.css" />
+  </head>
+  <body>
+    <header class="app-header">
+      <h1>Feasibility capture (§49 Q1/Q2/Q11)</h1>
+      <p class="hint">
+        Use this once, on the pilot raid, to see the RAW payloads GBF actually sends.
+        Toggle Feasibility mode ON, open DevTools on the GBF tab, start any session (Scan Account is fine),
+        visit an inventory / raid page, then come back here to inspect + copy the shapes.
+        Toggle OFF when done — nothing is written to disk.
+      </p>
+    </header>
+
+    <main class="app-body">
+      <section>
+        <h2>Mode</h2>
+        <label class="toggle">
+          <input type="checkbox" id="feasibility-toggle" />
+          Feasibility mode (bypass endpoint allowlist, capture ALL payloads)
+        </label>
+        <p class="warn" id="mode-warn" hidden>ON — the endpoint allowlist is bypassed. Turn OFF before regular use.</p>
+      </section>
+
+      <section>
+        <h2>Captured payloads (last 50)</h2>
+        <p class="hint">Bodies are truncated to 8 KiB. Session-only storage; cleared on browser restart.</p>
+        <div class="row">
+          <button type="button" id="refresh-btn">Refresh</button>
+          <button type="button" id="clear-btn" class="danger">Clear log</button>
+        </div>
+        <p id="notice" class="notice" role="status" aria-live="polite"></p>
+        <ol id="capture-list" class="capture-list"></ol>
+      </section>
+    </main>
+
+    <script type="module" src="diagnostics.js"></script>
+  </body>
+</html>
