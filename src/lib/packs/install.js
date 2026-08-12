@@ -35,6 +35,15 @@ export async function verifyChecksums(files, checksums) {
 // Returns { ok, bundle?, errors }.
 export async function prepareInstall(rawFiles) {
   const errors = [];
+  // Stage 0: refuse non-declarative files BEFORE parsing them (defense in
+  // depth on §41.4 — a .js file can't be valid JSON but we should never
+  // even attempt to parse it).
+  for (const name of Object.keys(rawFiles || {})) {
+    if (/\.(m?js|wasm|html|htm)$/i.test(name)) {
+      errors.push(`non-declarative file forbidden: ${name}`);
+    }
+  }
+  if (errors.length) return { ok: false, errors };
   const bundle = {};
   for (const [name, raw] of Object.entries(rawFiles || {})) {
     try {
