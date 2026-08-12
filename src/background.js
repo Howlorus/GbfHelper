@@ -23,6 +23,9 @@ import { getPack, listPacks } from "./lib/packs/registry.js";
 import { tierOf } from "./lib/storage/tiers.js";
 import { planQuickCleanup, planAdvancedCleanup, planWipeAll, applyCleanup } from "./lib/storage/cleanup.js";
 import { buildBackup, restoreBackup } from "./lib/storage/backup.js";
+import { buildInitialBattleState, applyEvent } from "./lib/battle/state-model.js";
+import { buildEvent, appendEvent } from "./lib/battle/event-log.js";
+import { finalizeRun } from "./lib/battle/session.js";
 
 const repo = wrapWithValidation(new IndexedDBRepository({ stores: STORE_NAMES, version: 1 }));
 
@@ -32,6 +35,9 @@ const BADGE_FG = "#101010";
 const STATE_KEY = "state";
 const SCAN_PROGRESS_KEY = "scanProgress";
 const SCAN_BUFFER_KEY = "scanBuffer";
+const BATTLE_STATE_KEY = "battleState";
+const BATTLE_EVENTS_KEY = "battleEvents";
+const BATTLE_SESSION_META_KEY = "battleSessionMeta";
 
 function initialScanBuffer() {
   return { characters: [], weapons: [], summons: [], teams: [], parserStatus: {}, warnings: [] };
@@ -80,6 +86,21 @@ async function dispatch(action) {
       });
     } else if (lifecycle === "clear") {
       await chrome.storage.session.remove([SCAN_PROGRESS_KEY, SCAN_BUFFER_KEY]);
+    }
+    // Battle-session lifecycle: seed a fresh state + event log on entry,
+    // finalize the run on exit (writes to runHistory, then clears buffers).
+    if (current.state !== STATES.RAID_SESSION_ACTIVE && next.state === STATES.RAID_SESSION_ACTIVE) {
+      await chrome.storage.session.set({
+        [BATTLE_STATE_KEY]: buildInitialBattleState({ tabId: next.tabId }),
+        [BATTLE_EVENTS_KEY]: [],
+        [BATTLE_SESSION_META_KEY]: {
+          sessionId: `raid-${Date.now()}`,
+          tabTitle: next.tabTitle || null,
+          startedAt: next.since || Date.now(),
+        },
+      });
+    } else if (current.state === STATES.RAID_SESSION_ACTIVE && next.state !== STATES.RAID_SESSION_ACTIVE) {
+      await finalizeRaidSession(action.type);
     }
     await updateBadge(next);
   }
@@ -186,6 +207,40 @@ async function commitInventory() {
   }
 }
 
+async function finalizeRaidSession(actionType) {
+  const store = await chrome.storage.session.get([BATTLE_STATE_KEY, BATTLE_EVENTS_KEY, BATTLE_SESSION_META_KEY]);
+  const meta = store[BATTLE_SESSION_META_KEY];
+  if (!meta) return;
+  const endReasonMap = {
+    STOP_SESSION: "user-stop",
+    TAB_CLOSED: "tab-closed",
+    TAB_NAVIGATED_AWAY: "tab-navigated-away",
+  };
+  const endReason = endReasonMap[actionType] || "user-stop";
+  try {
+    const run = finalizeRun({
+      sessionId: meta.sessionId,
+      raidId: store[BATTLE_STATE_KEY]?.raidId ?? null,
+      tabTitle: meta.tabTitle,
+      startedAt: meta.startedAt,
+      endedAt: Date.now(),
+      endReason,
+      events: store[BATTLE_EVENTS_KEY] || [],
+      finalState: store[BATTLE_STATE_KEY] || null,
+    });
+    const record = wrapEnvelope(run, {
+      schemaVersion: 1,
+      extensionVersion: chrome.runtime.getManifest().version,
+      now: Date.now(),
+    });
+    await repo.put("runHistory", record);
+  } catch (err) {
+    console.warn("[GBF Copilot] finalize raid session failed:", err);
+  } finally {
+    await chrome.storage.session.remove([BATTLE_STATE_KEY, BATTLE_EVENTS_KEY, BATTLE_SESSION_META_KEY]);
+  }
+}
+
 async function getStorageStats() {
   const stats = {};
   let quotaEstimate = null;
@@ -231,24 +286,38 @@ async function applyUpdate(rawFiles) {
 
 async function onCapturePayload(payload) {
   const state = await getState();
-  if (state.state !== STATES.ACCOUNT_SCAN_ACTIVE) return; // AC4
+  if (state.state === STATES.ACCOUNT_SCAN_ACTIVE) {
+    return sinkScanPayload(payload);
+  }
+  if (state.state === STATES.RAID_SESSION_ACTIVE) {
+    return sinkBattlePayload(payload);
+  }
+}
 
+async function sinkScanPayload(payload) {
   const store = await chrome.storage.session.get([SCAN_PROGRESS_KEY, SCAN_BUFFER_KEY]);
   const nextProgress = acceptPayload(store[SCAN_PROGRESS_KEY], payload);
-
-  // Parse into records and append to the appropriate purpose bucket.
   const buffer = store[SCAN_BUFFER_KEY] || initialScanBuffer();
   const { records, warnings, status } = parsePayload(payload.purpose, payload.body);
-  if (buffer[payload.purpose]) {
-    buffer[payload.purpose] = buffer[payload.purpose].concat(records);
-  }
+  if (buffer[payload.purpose]) buffer[payload.purpose] = buffer[payload.purpose].concat(records);
   buffer.parserStatus = { ...buffer.parserStatus, [payload.purpose]: status };
   if (warnings.length) buffer.warnings = buffer.warnings.concat(warnings.map((w) => `${payload.purpose}: ${w}`));
+  await chrome.storage.session.set({ [SCAN_PROGRESS_KEY]: nextProgress, [SCAN_BUFFER_KEY]: buffer });
+}
 
-  await chrome.storage.session.set({
-    [SCAN_PROGRESS_KEY]: nextProgress,
-    [SCAN_BUFFER_KEY]: buffer,
-  });
+// Battle payload sink. Real event extraction lands with feasibility Q2/Q6
+// once real GBF battle payload shapes are pinned. For now, we log an
+// "unknown"-kind event stamped with the observed URL + timestamp so the
+// event log grows during a session and finalization has something to
+// hand off to E10 Diagnosis later.
+async function sinkBattlePayload(payload) {
+  const store = await chrome.storage.session.get([BATTLE_STATE_KEY, BATTLE_EVENTS_KEY]);
+  const state = store[BATTLE_STATE_KEY] || buildInitialBattleState();
+  const events = store[BATTLE_EVENTS_KEY] || [];
+  const event = buildEvent("unknown", { ts: Date.now(), payload: { url: payload.url, purpose: payload.purpose } });
+  const nextEvents = appendEvent(events, event);
+  const nextState = applyEvent(state, {}, { now: event.ts });
+  await chrome.storage.session.set({ [BATTLE_STATE_KEY]: nextState, [BATTLE_EVENTS_KEY]: nextEvents });
 }
 
 chrome.runtime.onMessage.addListener((msg, _sender, sendResponse) => {
@@ -284,6 +353,12 @@ chrome.runtime.onMessage.addListener((msg, _sender, sendResponse) => {
         } catch (err) {
           sendResponse({ error: String(err?.message || err) });
         }
+      } else if (msg?.type === "LIST_RUNS") {
+        try { sendResponse(await repo.list("runHistory")); }
+        catch (err) { sendResponse({ error: String(err?.message || err) }); }
+      } else if (msg?.type === "DELETE_RUN") {
+        try { await repo.delete("runHistory", msg.runId); sendResponse({ ok: true }); }
+        catch (err) { sendResponse({ ok: false, error: String(err?.message || err) }); }
       } else if (msg?.type === "GET_STORAGE_STATS") {
         sendResponse(await getStorageStats());
       } else if (msg?.type === "QUICK_CLEANUP") {
