@@ -1,6 +1,6 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { diffPlans, DIFF_FIELDS } from "../src/lib/raid-plan/compare.js";
+import { diffPlans } from "../src/lib/raid-plan/compare.js";
 import { buildRaidPlan } from "../src/lib/raid-plan/schema.js";
 
 function base() {
@@ -46,8 +46,3 @@ test("null-vs-missing treated equal (both nullable)", () => {
   assert.equal(d.fields.mainSummon.same, true);
 });
 
-test("all DIFF_FIELDS include the §9.1 domain fields we care about", () => {
-  for (const f of ["party", "grid", "mainSummon", "rotation", "phaseRules", "omenResponses"]) {
-    assert.ok(DIFF_FIELDS.includes(f), `${f} missing from DIFF_FIELDS`);
-  }
-});

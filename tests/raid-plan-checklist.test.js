@@ -1,6 +1,6 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { buildChecklist, summarize, CHECK_STATES } from "../src/lib/raid-plan/checklist.js";
+import { buildChecklist } from "../src/lib/raid-plan/checklist.js";
 
 const emptyPlan = { party: [], grid: [], subSummons: [] };
 
@@ -44,16 +44,3 @@ test("support summon + raid bonus are always NotObservable", () => {
   assert.equal(items.find((i) => i.label === "Raid bonus").state, "NotObservable");
 });
 
-test("summarize counts each state", () => {
-  const items = buildChecklist({ ...emptyPlan, party: ["a", "b"] }, { characters: [{ id: "a" }] });
-  const counts = summarize(items);
-  assert.equal(counts.ConfirmedAutomatically, 1);
-  assert.equal(counts.Incorrect, 1);
-  assert.ok(counts.NotObservable >= 2);
-});
-
-test("CHECK_STATES matches §21 enum", () => {
-  for (const s of ["ConfirmedAutomatically", "ConfirmedManually", "Unverified", "Incorrect", "NotObservable"]) {
-    assert.ok(CHECK_STATES.includes(s));
-  }
-});

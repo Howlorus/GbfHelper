@@ -1,5 +1,5 @@
-// Raid Plan repository operations. Each save creates a NEW version record
-// under id=`${planId}@v${n}`. History is queryable via listVersions.
+// Raid Plan repository operations. Each save creates a NEW record at
+// id=`${planId}@v${n}`. History is queryable via listVersions.
 
 import { wrapEnvelope } from "../envelope.js";
 import { buildRaidPlan } from "./schema.js";
@@ -12,8 +12,7 @@ async function versionsOf(repo, planId) {
 }
 
 export async function getCurrentPlan(repo, planId) {
-  const versions = await versionsOf(repo, planId);
-  return versions[0] || null;
+  return (await versionsOf(repo, planId))[0] || null;
 }
 
 export async function listVersions(repo, planId) {
@@ -21,8 +20,7 @@ export async function listVersions(repo, planId) {
 }
 
 export async function saveNewVersion(repo, input, { extensionVersion = "0.0.0", now = Date.now() } = {}) {
-  const priorList = await versionsOf(repo, input.planId);
-  const prior = priorList[0] || null;
+  const prior = (await versionsOf(repo, input.planId))[0] || null;
   const nextVersion = prior ? prior.raidPlanVersion + 1 : 1;
   const plan = buildRaidPlan({
     ...input,
@@ -38,9 +36,8 @@ export async function duplicatePlan(repo, sourcePlanId, { newPlanId, extensionVe
   if (!newPlanId) throw new TypeError("newPlanId required");
   const src = await getCurrentPlan(repo, sourcePlanId);
   if (!src) throw new Error(`plan not found: ${sourcePlanId}`);
-  const content = stripStorageKeys(src);
   return saveNewVersion(repo, {
-    ...content,
+    ...stripStorageKeys(src),
     planId: newPlanId,
     status: "variant",
     changeSource: "duplicated",
@@ -65,20 +62,6 @@ export async function revertToVersion(repo, planId, targetVersion, meta = {}) {
     status: "current",
     changeSource: `reverted-from-v${targetVersion}`,
   }, meta);
-}
-
-// Current version per plan family, then optional { status, raidId } filter.
-export async function listCurrentPlans(repo, { status, raidId } = {}) {
-  const all = await repo.list(STORE);
-  const byFamily = new Map();
-  for (const p of all) {
-    const cur = byFamily.get(p.planId);
-    if (!cur || p.raidPlanVersion > cur.raidPlanVersion) byFamily.set(p.planId, p);
-  }
-  return [...byFamily.values()].filter((p) =>
-    (status === undefined || p.status === status) &&
-    (raidId === undefined || p.raidId === raidId)
-  );
 }
 
 function stripStorageKeys(rec) {

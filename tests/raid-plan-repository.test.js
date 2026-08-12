@@ -5,7 +5,7 @@ import { STORE_NAMES } from "../src/lib/stores.js";
 import { wrapWithValidation } from "../src/lib/corruption.js";
 import {
   saveNewVersion, duplicatePlan, archivePlan, revertToVersion,
-  getCurrentPlan, listVersions, listCurrentPlans,
+  getCurrentPlan, listVersions,
 } from "../src/lib/raid-plan/repository.js";
 
 function newRepo() { return wrapWithValidation(new InMemoryRepository(STORE_NAMES)); }
@@ -81,17 +81,6 @@ test("revertToVersion on a missing target throws", async () => {
   const r = newRepo();
   await saveNewVersion(r, goodInput());
   await assert.rejects(() => revertToVersion(r, "plan-1", 99), /version not found/);
-});
-
-test("listCurrentPlans returns one record per family + filters", async () => {
-  const r = newRepo();
-  await saveNewVersion(r, { ...goodInput() });
-  await saveNewVersion(r, { ...goodInput(), objective: "safe-solo" });
-  await saveNewVersion(r, { planId: "plan-2", raidId: "belial", element: "dark", objective: "first-clear" });
-  assert.equal((await listCurrentPlans(r)).length, 2);
-  const bp = await listCurrentPlans(r, { raidId: "bahamut-proud" });
-  assert.equal(bp.length, 1);
-  assert.equal(bp[0].raidPlanVersion, 2);
 });
 
 test("duplicatePlan refuses without newPlanId", async () => {

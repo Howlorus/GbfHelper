@@ -1,18 +1,12 @@
-// Raid Plan record (§9.1/§9.2). Storage id encodes the version:
-//   id = `${planId}@v${raidPlanVersion}`
-// so every version is a distinct record. planId groups the family;
-// raidPlanVersion orders them. §9.1 domain fields default nullable until
-// a producer fills them (E08/E10/E14).
+// Raid Plan record (§9.1/§9.2). id = `${planId}@v${raidPlanVersion}`;
+// planId groups the family, raidPlanVersion orders. Only fields with a
+// realistic MVP producer are declared — extra §9.1 fields land with the
+// writer that fills them.
 
 export const RAID_PLAN_STATUSES = Object.freeze(["draft", "current", "variant", "archived"]);
 
 export function storageId(planId, version) {
   return `${planId}@v${version}`;
-}
-
-export function parseStorageId(id) {
-  const m = /^(.+)@v(\d+)$/.exec(String(id || ""));
-  return m ? { planId: m[1], version: +m[2] } : null;
 }
 
 export function buildRaidPlan(input) {
@@ -29,24 +23,11 @@ export function buildRaidPlan(input) {
     status: input.status || "current",
 
     party: input.party ?? [],
-    backline: input.backline ?? [],
-    mainClass: input.mainClass ?? null,
-    classSkills: input.classSkills ?? [],
     grid: input.grid ?? [],
+    mainClass: input.mainClass ?? null,
     mainSummon: input.mainSummon ?? null,
-    subSummons: input.subSummons ?? [],
-    supportSummon: input.supportSummon ?? null,
-    raidBonus: input.raidBonus ?? null,
-    consumables: input.consumables ?? [],
     rotation: input.rotation ?? [],
-    phaseRules: input.phaseRules ?? [],
-    triggerResponses: input.triggerResponses ?? [],
-    omenResponses: input.omenResponses ?? [],
-    resourceConservationRules: input.resourceConservationRules ?? [],
-    fallbackRules: input.fallbackRules ?? [],
-
-    sourceStrategyPackId: input.sourceStrategyPackId ?? null,
-    sourceStrategyPackVersion: input.sourceStrategyPackVersion ?? null,
+    raidBonus: input.raidBonus ?? null,
 
     changeSource: input.changeSource || "user-edit",
     previousVersion: input.previousVersion ?? null,

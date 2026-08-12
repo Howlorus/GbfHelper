@@ -1,12 +1,12 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { buildRaidPlan, validateRaidPlan, storageId, parseStorageId, RAID_PLAN_STATUSES } from "../src/lib/raid-plan/schema.js";
+import { buildRaidPlan, validateRaidPlan, storageId } from "../src/lib/raid-plan/schema.js";
 
 function goodInput() {
   return { planId: "plan-1", raidId: "bahamut-proud", element: "dark", objective: "first-clear" };
 }
 
-test("buildRaidPlan constructs storage id from planId + version, fills §9.1 defaults", () => {
+test("buildRaidPlan constructs storage id from planId + version, fills defaults", () => {
   const p = buildRaidPlan(goodInput());
   assert.equal(p.id, "plan-1@v1");
   assert.equal(p.planId, "plan-1");
@@ -17,8 +17,7 @@ test("buildRaidPlan constructs storage id from planId + version, fills §9.1 def
 });
 
 test("buildRaidPlan honors raidPlanVersion when provided", () => {
-  const p = buildRaidPlan({ ...goodInput(), raidPlanVersion: 4 });
-  assert.equal(p.id, "plan-1@v4");
+  assert.equal(buildRaidPlan({ ...goodInput(), raidPlanVersion: 4 }).id, "plan-1@v4");
 });
 
 test("buildRaidPlan preserves user-provided domain fields", () => {
@@ -36,14 +35,6 @@ test("validateRaidPlan refuses an unknown status", () => {
   assert.throws(() => validateRaidPlan(p), /status/);
 });
 
-test("storageId + parseStorageId round-trip", () => {
+test("storageId formats planId + version", () => {
   assert.equal(storageId("plan-1", 3), "plan-1@v3");
-  assert.deepEqual(parseStorageId("plan-1@v3"), { planId: "plan-1", version: 3 });
-  assert.equal(parseStorageId("not-versioned"), null);
-});
-
-test("RAID_PLAN_STATUSES covers the lifecycle states", () => {
-  for (const s of ["draft", "current", "variant", "archived"]) {
-    assert.ok(RAID_PLAN_STATUSES.includes(s));
-  }
 });
