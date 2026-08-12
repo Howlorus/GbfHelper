@@ -1,0 +1,41 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <title>GBF Copilot — Live Coach</title>
+    <link rel="stylesheet" href="overlay.css" />
+  </head>
+  <body data-collapsed="false" data-suspended="true">
+    <header class="ovl-header" id="ovl-header" title="Drag to reposition">
+      <span class="dot" aria-hidden="true"></span>
+      <h1>Live Coach</h1>
+      <span class="collapse-hint" id="collapse-hint">Alt+O</span>
+      <button type="button" id="stop-btn" class="stop-btn" title="Stop session">Stop</button>
+    </header>
+
+    <main class="ovl-body" id="ovl-body" aria-live="polite">
+      <section class="field" id="field-next-threat">
+        <div class="label">Next threat</div>
+        <div class="value" id="next-threat">—</div>
+      </section>
+      <section class="field" id="field-action">
+        <div class="label">Recommended action</div>
+        <div class="value primary" id="action">—</div>
+      </section>
+      <section class="field" id="field-reason">
+        <div class="label">Reason</div>
+        <div class="value" id="reason">Waiting for synchronized state before showing guidance.</div>
+      </section>
+      <section class="field" id="field-confidence">
+        <div class="label">Confidence</div>
+        <div class="value" id="confidence">—</div>
+      </section>
+      <section class="field field-sync" id="field-sync">
+        <div class="label">Synchronization</div>
+        <div class="value" id="synchronization">Waiting…</div>
+      </section>
+    </main>
+
+    <script type="module" src="overlay.js"></script>
+  </body>
+</html>

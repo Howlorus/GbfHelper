@@ -225,6 +225,20 @@ document.getElementById("actions").addEventListener("click", async (e) => {
   if (btn.dataset.event === "START_CALIBRATION_SESSION" && next?.state === STATES.CALIBRATION_SESSION_ACTIVE) {
     chrome.tabs.create({ url: chrome.runtime.getURL("src/calibration/calibration.html") });
   }
+  // Auto-open the Live Coach overlay window on Raid Session start (US-11-01).
+  if (btn.dataset.event === "START_RAID_SESSION" && next?.state === STATES.RAID_SESSION_ACTIVE) {
+    const { liveCoachOverlayPrefs: prefs } = await chrome.storage.local.get("liveCoachOverlayPrefs");
+    const g = prefs || {};
+    chrome.windows.create({
+      url: chrome.runtime.getURL("src/live-coach/overlay.html"),
+      type: "popup",
+      width: g.width || 340,
+      height: g.height || 220,
+      left: Number.isFinite(g.left) ? g.left : undefined,
+      top: Number.isFinite(g.top) ? g.top : undefined,
+      focused: false,
+    });
+  }
   await refresh();
 });
 

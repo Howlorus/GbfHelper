@@ -1,0 +1,56 @@
+/* Compact overlay (§34.4). Color-blind-safe status colors (blue = ready,
+   amber = stabilizing, red = suspended — never rely on hue alone; labels
+   always render). Reduced-motion respected. */
+
+:root {
+  --bg: #0f1116; --fg: #e6e8ec; --muted: #8a90a0;
+  --sync-ok: #4fa3ff; --sync-warn: #e0b060; --sync-bad: #e07070;
+  --divider: #22262d; --surface: #171a20;
+}
+@media (prefers-color-scheme: light) {
+  :root { --bg: #ffffff; --fg: #14161a; --muted: #5c6370;
+    --sync-ok: #0057c2; --sync-warn: #a3620d; --sync-bad: #b31414;
+    --divider: #e5e7eb; --surface: #f4f5f7; }
+}
+@media (prefers-reduced-motion: reduce) {
+  * { animation: none !important; transition: none !important; }
+}
+
+html, body { margin: 0; padding: 0; height: 100%; background: var(--bg); color: var(--fg);
+  font: 12px/1.4 -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+  overflow: hidden; }
+
+.ovl-header {
+  display: flex; align-items: center; gap: 6px; padding: 6px 10px;
+  border-bottom: 1px solid var(--divider); background: var(--surface);
+  user-select: none; cursor: grab;
+}
+.ovl-header h1 { margin: 0; font-size: 11px; font-weight: 700; letter-spacing: 0.5px; text-transform: uppercase; flex: 1; }
+.dot { width: 8px; height: 8px; border-radius: 50%; background: var(--sync-bad); flex-shrink: 0; }
+body[data-suspended="false"] .dot { background: var(--sync-ok); }
+.collapse-hint { color: var(--muted); font-size: 10px; padding: 2px 6px; border: 1px solid var(--divider); border-radius: 3px; }
+.stop-btn {
+  padding: 2px 8px; font: inherit; font-size: 10px; font-weight: 600; cursor: pointer;
+  background: var(--surface); color: var(--sync-bad); border: 1px solid var(--sync-bad); border-radius: 3px;
+}
+.stop-btn:hover { background: var(--sync-bad); color: #fff; }
+
+.ovl-body {
+  padding: 8px 10px; display: grid; gap: 6px;
+  grid-template-columns: 1fr;
+}
+body[data-collapsed="true"] .ovl-body { display: none; }
+
+.field { display: grid; grid-template-columns: 90px 1fr; gap: 8px; align-items: baseline; }
+.field .label { color: var(--muted); font-size: 10px; text-transform: uppercase; letter-spacing: 0.3px; }
+.field .value { font-size: 12px; word-break: break-word; }
+.field .value.primary { font-size: 13px; font-weight: 600; }
+
+/* When suspended, only the sync field is visually emphasized (AC6). */
+body[data-suspended="true"] #field-next-threat,
+body[data-suspended="true"] #field-action,
+body[data-suspended="true"] #field-confidence { opacity: 0.35; }
+
+.value.sync-ok { color: var(--sync-ok); }
+.value.sync-warn { color: var(--sync-warn); }
+.value.sync-bad { color: var(--sync-bad); }
