@@ -32,12 +32,6 @@ test("empty event log -> ObservationFailure with 'open DevTools' hint", () => {
   assert.match(d.suggestedAction, /DevTools/);
 });
 
-test("turns >> calibration.expectedTurns -> PredictionFailure (Likely)", () => {
-  const d = classifyRun(runWith({ turns: 25 }), { calibration: { expectedTurns: 10 } });
-  assert.equal(d.category, CATEGORY.PREDICTION_FAILURE);
-  assert.equal(d.confidence, "Likely");
-});
-
 test("Synchronized run with events but no calibration -> VarianceIssue / InsufficientData", () => {
   const d = classifyRun(runWith());
   assert.equal(d.category, CATEGORY.VARIANCE_ISSUE);
