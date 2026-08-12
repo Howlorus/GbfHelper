@@ -42,19 +42,14 @@ export function planWipeAll(allStoreNames) {
   };
 }
 
+// Each store is cleared independently — a failure on one does not roll back
+// what was already cleared elsewhere. Cleanup is idempotent so partial
+// success is safe to retry.
 export async function applyCleanup(repo, plan) {
   const before = {};
   const after = {};
   for (const store of plan.stores) {
     try { before[store] = (await repo.list(store)).length; } catch { before[store] = null; }
-  }
-  await repo.transaction(plan.stores, async (tx) => {
-    for (const store of plan.stores) await tx.list(store).then(() => null);
-  });
-  // The above just proves the tx opens; do the actual deletes outside the tx
-  // so partial failures don't roll BACK past what was already cleared. Each
-  // store is cleared independently.
-  for (const store of plan.stores) {
     try { await repo.clear(store); after[store] = 0; }
     catch (err) { after[store] = `error: ${err?.message || err}`; }
   }

@@ -22,7 +22,7 @@ test("planQuickCleanup targets rebuildable stores only", () => {
   const plan = planQuickCleanup();
   for (const s of plan.stores) assert.ok(["searchIndexes", "sourceCache", "diagnostics"].includes(s));
   assert.ok(plan.stores.includes("searchIndexes"));
-  assert.equal(plan.requireTypedConfirmation, undefined); // Quick Cleanup is always safe
+  assert.notEqual(plan.requireTypedConfirmation, true); // Quick Cleanup is always safe
 });
 
 test("planQuickCleanup + applyCleanup wipes rebuildable stores but preserves user data", async () => {

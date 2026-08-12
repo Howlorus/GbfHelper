@@ -1,15 +1,12 @@
-// §35.1 storage tiers. Each §7.6 store gets a tier that determines
-// what Quick / Advanced Cleanup may touch.
-
 export const TIER = Object.freeze({
-  CRITICAL: "critical",           // protected by default — deletion needs typed confirmation
-  CONFIGURABLE: "configurable",   // retention-controlled
-  REBUILDABLE: "rebuildable",     // safe to recreate — Quick Cleanup ok
+  CRITICAL: "critical",
+  CONFIGURABLE: "configurable",
+  REBUILDABLE: "rebuildable",
 });
 
 const STORE_TIER = {
   gameData: TIER.CONFIGURABLE,
-  strategyPacks: TIER.CRITICAL,      // user-reviewed strategies are §35.1 critical
+  strategyPacks: TIER.CRITICAL, // user-reviewed strategies are §35.1 critical
   terminologyPacks: TIER.CONFIGURABLE,
   inventory: TIER.CRITICAL,
   raidPlans: TIER.CRITICAL,
